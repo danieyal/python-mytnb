@@ -146,5 +146,3 @@ except MyTNBError as e:
 ## License
 
 MIT
-
-MIT
