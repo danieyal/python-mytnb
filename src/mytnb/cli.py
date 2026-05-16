@@ -198,8 +198,9 @@ def login(ctx):
 @cli.command()
 @click.argument("account")
 @click.option("--json", "as_json", is_flag=True, help="Output full JSON instead of table.")
+@click.option("--daily", is_flag=True, help="Show daily usage breakdown instead of monthly.")
 @click.pass_context
-def usage(ctx, account, as_json):
+def usage(ctx, account, as_json, daily):
     """Get smart meter usage & billing data."""
 
     async def _usage():
@@ -212,7 +213,24 @@ def usage(ctx, account, as_json):
                 _print_json(result)
                 return
 
-            # Show a summary table
+            if daily:
+                # Show daily usage table
+                for period in result.by_day:
+                    table = Table(title=f"Daily Usage — {period.range}")
+                    table.add_column("Date", style="cyan")
+                    table.add_column("Usage (kWh)", justify="right")
+                    table.add_column("Cost (RM)", justify="right", style="green")
+                    for day in period.days:
+                        table.add_row(
+                            day.date,
+                            day.consumption or "0",
+                            day.amount or "0.00",
+                        )
+                    console.print(table)
+                    console.print()
+                return
+
+            # Show monthly summary table
             table = Table(title=f"Usage — {account}")
             table.add_column("Month", style="cyan")
             table.add_column("Usage (kWh)", justify="right")
