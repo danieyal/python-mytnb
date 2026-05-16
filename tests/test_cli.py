@@ -74,7 +74,9 @@ class TestInitConfig:
         output = tmp_path / "mytnb.json"
         with patch("sys.argv", ["mytnb", "init-config", "-o", str(output)]):
             from mytnb.cli import main
-            main()
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
         assert output.exists()
         cfg = json.loads(output.read_text())
         assert "api_key" in cfg
@@ -86,5 +88,6 @@ class TestInitConfig:
         output.write_text("{}")
         with patch("sys.argv", ["mytnb", "init-config", "-o", str(output)]):
             from mytnb.cli import main
-            with pytest.raises(SystemExit):
+            with pytest.raises(SystemExit) as exc_info:
                 main()
+            assert exc_info.value.code != 0
