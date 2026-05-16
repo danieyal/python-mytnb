@@ -58,7 +58,9 @@ All commands:
 
 ```
 mytnb login                                  # Test login, show user info
-mytnb usage <account>                        # Usage & billing data
+mytnb usage <account>                        # Monthly usage & billing summary
+mytnb usage --daily <account>                # Daily usage breakdown
+mytnb usage --json <account>                 # Full usage data as JSON
 mytnb current-usage <account>                # Simplified current usage summary
 mytnb due-amount <account>                   # Outstanding balance
 mytnb bill-history <account>                 # Payment history
@@ -66,6 +68,8 @@ mytnb smr <account1>,<account2>              # Smart Meter Reading status
 mytnb services                               # Available services
 mytnb recommendations <account>              # Energy recommendations
 ```
+
+Global options: `--debug` for full tracebacks, `--version`.
 
 Use a config file instead of flags (`--config <path>`, `mytnb.json`, or `~/.config/mytnb/config.json`):
 
