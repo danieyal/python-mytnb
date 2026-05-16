@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import re
+import uuid
 from typing import Any, Optional
 
 import httpx
+import tls_client
 
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.crypto import encrypt_request
@@ -19,9 +23,15 @@ from mytnb.models import (
 # Base URLs
 LEGACY_BASE_URL = "https://mytnbapp.tnb.com.my/v7/mytnbws.asmx"
 REST_BASE_URL = "https://api.mytnb.com.my"
+SITECORE_LOGIN_URL = "https://www.mytnb.com.my/api/sitecore/Account/Login"
+SSO_HANDLER_URL = "https://myaccount.mytnb.com.my/SSO/SSOHandler"
 
-# Default user agent
-USER_AGENT = "myTNB/1425 CFNetwork/3860.500.112 Darwin/25.4.0"
+# Default user agents
+USER_AGENT = "RestSharp/110.2.0.0"
+USER_AGENT_IOS = "myTNB/1425 CFNetwork/3860.500.112 Darwin/25.4.0"
+
+# Default API key for token generation (embedded in the mobile app)
+DEFAULT_API_KEY = "gpUS5pe4aO2yMbId7bFa13dGfYYnBWbjn3vqn0d7"
 
 
 class MyTNBClient:
@@ -47,6 +57,7 @@ class MyTNBClient:
         self._timeout = timeout
         self._use_staging_key = use_staging_key
         self._http_client: Optional[httpx.AsyncClient] = None
+        self._tls_session: Optional[tls_client.Session] = None
 
     @property
     def _client(self) -> httpx.AsyncClient:
@@ -56,6 +67,18 @@ class MyTNBClient:
                 headers={"User-Agent": USER_AGENT},
             )
         return self._http_client
+
+    @property
+    def _legacy_client(self) -> tls_client.Session:
+        """Get or create a tls_client session for legacy ASMX requests.
+
+        Uses an Android TLS fingerprint to bypass CloudFront WAF.
+        """
+        if self._tls_session is None:
+            self._tls_session = tls_client.Session(
+                client_identifier="okhttp4_android_13",
+            )
+        return self._tls_session
 
     async def close(self) -> None:
         """Close the HTTP client."""
@@ -67,6 +90,154 @@ class MyTNBClient:
 
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
+
+    # ──────────────────────────────────────────────────────────────────
+    # Authentication
+    # ──────────────────────────────────────────────────────────────────
+
+    @classmethod
+    async def login(
+        cls,
+        email: str,
+        password: str,
+        *,
+        device_id: str | None = None,
+        timeout: float = 30.0,
+        use_staging_key: bool = False,
+    ) -> "MyTNBClient":
+        """Authenticate with email and password, returning a ready-to-use client.
+
+        Performs the full login flow:
+        1. Authenticate via Sitecore web login (plaintext credentials)
+        2. Submit SSO form to get user identity (userId)
+        3. Generate an access token via the REST Identity API
+
+        Args:
+            email: myTNB account email.
+            password: myTNB account password.
+            device_id: Optional device UUID (generated if not provided).
+            timeout: HTTP timeout in seconds.
+            use_staging_key: Use the staging RSA key for encryption.
+
+        Returns:
+            An authenticated MyTNBClient instance.
+        """
+        if not device_id:
+            device_id = str(uuid.uuid4()).upper()
+
+        device_info = DeviceInfo(device_id=device_id)
+
+        async with httpx.AsyncClient(
+            follow_redirects=False,
+            timeout=timeout,
+            headers={"User-Agent": USER_AGENT},
+        ) as http:
+            # Step 1: Sitecore login (get SSO form with encrypted credentials)
+            await http.get("https://www.mytnb.com.my/")
+
+            login_resp = await http.post(
+                SITECORE_LOGIN_URL,
+                data={"Email": email, "Password": password},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Origin": "https://www.mytnb.com.my",
+                    "Referer": "https://www.mytnb.com.my/",
+                },
+            )
+
+            if login_resp.status_code != 200:
+                raise AuthenticationError(
+                    "Login failed",
+                    error_code=str(login_resp.status_code),
+                )
+
+            # Extract SSO form fields from the HTML response
+            sso_fields = dict(
+                re.findall(
+                    r'name="([^"]+)"\s+value="([^"]*)"',
+                    login_resp.text,
+                )
+            )
+            if "USERNAME" not in sso_fields:
+                raise AuthenticationError(
+                    "Invalid credentials or unexpected login response",
+                    error_code="LOGIN_FAILED",
+                )
+
+            # Step 2: Submit SSO form to get JWT with userId
+            sso_resp = await http.post(
+                SSO_HANDLER_URL,
+                data=sso_fields,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Origin": "https://www.mytnb.com.my",
+                },
+            )
+
+            if sso_resp.status_code != 200:
+                raise AuthenticationError(
+                    "SSO authentication failed",
+                    error_code=str(sso_resp.status_code),
+                )
+
+            # Extract userId from JWT in set-cookie headers
+            user_id = None
+            user_name = email
+            display_name = ""
+            for cookie_header in sso_resp.headers.get_list("set-cookie"):
+                if "eyJhbGci" not in cookie_header:
+                    continue
+                jwt_match = re.search(r"=(eyJ[^;]+)", cookie_header)
+                if not jwt_match:
+                    continue
+                parts = jwt_match.group(1).split(".")
+                payload_b64 = parts[1] + "=" * (4 - len(parts[1]) % 4)
+                jwt_data = json.loads(base64.b64decode(payload_b64))
+                ui = json.loads(jwt_data["UserInfo"])
+                user_id = ui["UserId"]
+                user_name = ui.get("UserName", email)
+                display_name = ui.get("DisplayName", "")
+                break
+
+            if not user_id:
+                raise AuthenticationError(
+                    "Failed to extract user identity from SSO response",
+                    error_code="SSO_PARSE_FAILED",
+                )
+
+            # Step 3: Generate access token via REST API
+            token_resp = await http.post(
+                f"{REST_BASE_URL}/Identity/api/v1/Identity/GenerateAccessToken",
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": DEFAULT_API_KEY,
+                    "Accept": "application/json",
+                },
+                params={"environment": "Prod"},
+                json={
+                    "channel": "myTNB_API_Mobile",
+                    "userId": user_id,
+                },
+            )
+            token_resp.raise_for_status()
+            token_data = token_resp.json()
+            access_token = token_data["content"]["accessToken"]
+
+        secure_key = str(uuid.uuid4()).upper()
+
+        credentials = Credentials(
+            api_key=DEFAULT_API_KEY,
+            authorization_token=access_token,
+            secure_key=secure_key,
+            user_info=UserInfo(
+                user_name=user_name,
+                user_id=user_id,
+                display_name=display_name,
+            ),
+            device_info=device_info,
+        )
+
+        return cls(credentials, timeout=timeout, use_staging_key=use_staging_key)
 
     # ──────────────────────────────────────────────────────────────────
     # REST API helpers
@@ -194,6 +365,7 @@ class MyTNBClient:
         """Make a POST request to the legacy ASMX API.
 
         Automatically encrypts the data using AES-256-CBC + RSA-OAEP.
+        Uses tls_client with an Android TLS fingerprint to bypass CloudFront WAF.
 
         Args:
             endpoint: The ASMX method name (e.g., "GetAccountUsageSmart")
@@ -201,24 +373,36 @@ class MyTNBClient:
         """
         url = f"{LEGACY_BASE_URL}/{endpoint}"
         headers = self._legacy_headers()
+        headers["User-Agent"] = USER_AGENT
+
+        # ASMX requests do NOT include deviceInf (per decompiled app code)
+
         payload = encrypt_request(data, use_staging_key=self._use_staging_key)
         body = {"dt": payload.to_dict()}
 
-        response = await self._client.post(url, headers=headers, json=body)
+        response = self._legacy_client.post(url, headers=headers, json=body)
 
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
 
-        response.raise_for_status()
+        if response.status_code != 200:
+            raise APIError(
+                message=f"Legacy API request failed with status {response.status_code}",
+                error_code=str(response.status_code),
+            )
+
         data = response.json()
 
         # Check the 'd' wrapper for errors
         d = data.get("d", {})
-        if d.get("isError") == "true":
+        error_code = d.get("ErrorCode")
+        if error_code and error_code not in ("7200", "7204"):
+            display_msg = d.get("DisplayMessage") or d.get("displayMessage")
+            msg = display_msg or d.get("Message") or d.get("message") or "Unknown error"
             raise APIError(
-                message=d.get("message", "Unknown error"),
-                error_code=d.get("ErrorCode"),
-                display_message=d.get("DisplayMessage"),
+                message=msg,
+                error_code=error_code,
+                display_message=display_msg,
             )
 
         return d
@@ -295,21 +479,29 @@ class MyTNBClient:
     # ──────────────────────────────────────────────────────────────────
 
     def _base_user_info(self) -> dict:
-        """Build the usrInf object from credentials."""
+        """Build the usrInf object from credentials for legacy ASMX requests."""
         ui = self._credentials.user_info
         di = self._credentials.device_info
         if not ui:
             raise MyTNBError("user_info is required for legacy API calls")
         return {
+            "eid": ui.user_name,
             "sspuid": ui.user_id,
             "did": di.device_id if di else "",
             "ft": "",
             "lang": ui.language,
-            "sec_auth_k1": self._credentials.secure_key or "",
+            "sec_auth_k1": "E6148656-205B-494C-BC95-CC241423E72F",
             "sec_auth_k2": "",
             "ses_param1": "",
             "ses_param2": "",
         }
+
+    def _device_info(self) -> dict:
+        """Build the deviceInf object for legacy ASMX requests."""
+        di = self._credentials.device_info
+        if not di:
+            return {}
+        return di.to_dict()
 
     async def get_account_usage_smart(
         self,
@@ -327,9 +519,9 @@ class MyTNBClient:
             AccountUsage object with usage and billing data.
         """
         data = {
-            "AccountNumber": account_number,
-            "isOwner": is_owner,
-            "MeterCode": "",
+            "contractAccount": account_number,
+            "isOwner": "true" if is_owner else "false",
+            "metercode": "",
             "usrInf": self._base_user_info(),
         }
         result = await self._legacy_post("GetAccountUsageSmart", data)
@@ -380,8 +572,8 @@ class MyTNBClient:
             Raw recommendations data.
         """
         data = {
-            "AccountNumber": account_number,
-            "isOwner": is_owner,
+            "contractAccount": account_number,
+            "isOwner": "true" if is_owner else "false",
             "usrInf": self._base_user_info(),
         }
         result = await self._legacy_post("GetUserEBRecommendations", data)
@@ -403,8 +595,8 @@ class MyTNBClient:
             Raw due amount data.
         """
         data = {
-            "AccountNumber": account_number,
-            "IsOwnedAccount": is_owner,
+            "contractAccount": account_number,
+            "isOwnedAccount": "true" if is_owner else "false",
             "usrInf": self._base_user_info(),
         }
         result = await self._legacy_post("GetAccountDueAmount", data)
@@ -426,7 +618,7 @@ class MyTNBClient:
             Raw bill history data.
         """
         data = {
-            "accNum": account_number,
+            "contractAccount": account_number,
             "isOwnedAccount": is_owner,
             "usrInf": self._base_user_info(),
         }

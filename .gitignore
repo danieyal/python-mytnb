@@ -21,33 +21,7 @@ env/
 *.swo
 
 # Reverse-engineering artifacts
-decompiled-apk/
-extracted_assemblies/
-
-# Scratch / analysis scripts
-analyze_endpoints.py
-debug_fields.py
-decompile_il.py
-dump_all_fields.py
-dump_fields.py
-dump_request_types.py
-extract_keys.py
-extract_resources.py
-extract_resources2.py
-find_endpoints.py
-parse_dotnet.py
-raw_search.py
-search_dlls.py
-search_missing.py
-trace_endpoints.py
-trace_inheritance.py
-verify_model.py
-
-# Captured data
-*.har
-stream-response.txt
-api.txt
-data-sample.yaml
+resources/
 
 # Config with credentials
 mytnb.json

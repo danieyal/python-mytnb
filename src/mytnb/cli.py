@@ -11,6 +11,7 @@ from pathlib import Path
 
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.client import MyTNBClient
+from mytnb.exceptions import MyTNBError
 
 
 def _load_config(path: str | None = None) -> dict:
@@ -79,11 +80,30 @@ def _print_json(data: object) -> None:
 
 
 async def _run(args: argparse.Namespace) -> None:
-    cfg = _load_config(args.config)
-    creds = _build_credentials(cfg)
-    staging = cfg.get("staging", False)
+    if args.command == "init-config":
+        _init_config(args)
+        return
 
-    async with MyTNBClient(creds, use_staging_key=staging) as client:
+    # Determine auth method: --email/--password or config file
+    email = getattr(args, "email", None) or os.environ.get("MYTNB_EMAIL")
+    password = getattr(args, "password", None) or os.environ.get("MYTNB_PASSWORD")
+
+    if email and password:
+        client = await MyTNBClient.login(email, password)
+    else:
+        cfg = _load_config(args.config)
+        if not cfg:
+            print(
+                "Error: No credentials. Use --email/--password or create a config file "
+                "(run: mytnb init-config)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        creds = _build_credentials(cfg)
+        staging = cfg.get("staging", False)
+        client = MyTNBClient(creds, use_staging_key=staging)
+
+    async with client:
         match args.command:
             case "usage":
                 result = await client.get_account_usage_smart(args.account)
@@ -122,6 +142,14 @@ async def _run(args: argparse.Namespace) -> None:
             case "eligibility-icons":
                 result = await client.get_eligibility_icons()
                 _print_json(result)
+
+            case "login":
+                info = {
+                    "user_id": client._credentials.user_info.user_id,
+                    "user_name": client._credentials.user_info.user_name,
+                    "authenticated": True,
+                }
+                _print_json(info)
 
             case "init-config":
                 _init_config(args)
@@ -165,6 +193,14 @@ def main() -> None:
         "-c", "--config",
         help="Path to config JSON file (default: mytnb.json or ~/.config/mytnb/config.json)",
     )
+    parser.add_argument(
+        "-e", "--email",
+        help="myTNB account email (or set MYTNB_EMAIL env var)",
+    )
+    parser.add_argument(
+        "-p", "--password",
+        help="myTNB account password (or set MYTNB_PASSWORD env var)",
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -207,8 +243,17 @@ def main() -> None:
     # ── eligibility-icons ────────────────────────────────────────────
     sub.add_parser("eligibility-icons", help="Get eligibility feature icons")
 
+    # ── login ────────────────────────────────────────────────────────
+    sub.add_parser("login", help="Test login and show user info")
+
     args = parser.parse_args()
-    asyncio.run(_run(args))
+    try:
+        asyncio.run(_run(args))
+    except MyTNBError as exc:
+        label = type(exc).__name__
+        code = f" [{exc.error_code}]" if exc.error_code else ""
+        print(f"Error ({label}{code}): {exc}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

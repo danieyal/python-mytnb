@@ -13,21 +13,12 @@ pip install -e .
 ```python
 import asyncio
 from mytnb import MyTNBClient
-from mytnb.auth import Credentials, UserInfo, DeviceInfo
-
-credentials = Credentials(
-    api_key="your-x-api-key",
-    authorization_token="your-jwt-token",
-    secure_key="your-secure-key",
-    user_info=UserInfo(
-        user_name="user@example.com",
-        user_id="your-user-uuid",
-    ),
-    device_info=DeviceInfo(device_id="YOUR-DEVICE-UUID"),
-)
 
 async def main():
-    async with MyTNBClient(credentials) as client:
+    # Login with email and password
+    client = await MyTNBClient.login("user@example.com", "your-password")
+
+    async with client:
         # Smart meter usage (auto-encrypted)
         usage = await client.get_account_usage_smart("220123456789")
         print(f"Current usage: {usage.current_usage_kwh} kWh")
@@ -45,37 +36,44 @@ async def main():
         # Due amount
         due = await client.get_account_due_amount("220123456789")
 
-        # REST API - Bill eligibility
-        eligibility = await client.get_bill_eligibility(
-            contract_accounts=["220123456789"],
-            user_id="your-user-uuid",
-        )
-
 asyncio.run(main())
 ```
 
 ## CLI
 
-A command-line interface is included. Generate a config file first:
+The easiest way is to pass your myTNB credentials directly:
 
 ```bash
-python -m mytnb init-config
-# Edit mytnb.json with your credentials
+python -m mytnb --email user@example.com --password yourpass usage 220123456789
+python -m mytnb -e user@example.com -p yourpass current-usage 220123456789
 ```
 
-Then query the API:
+Or set environment variables:
 
 ```bash
+export MYTNB_EMAIL=user@example.com
+export MYTNB_PASSWORD=yourpass
 python -m mytnb usage 220123456789
-python -m mytnb current-usage 220123456789
-python -m mytnb due-amount 220123456789
-python -m mytnb bill-history 220123456789
-python -m mytnb smr 220123456789,220987654321
-python -m mytnb services
-python -m mytnb recommendations 220123456789
 ```
 
-Config is loaded from `mytnb.json`, `~/.config/mytnb/config.json`, `MYTNB_CONFIG` env var, or `--config <path>`.
+All commands:
+
+```bash
+python -m mytnb login                              # Test login, show user info
+python -m mytnb usage 220123456789                  # Smart meter usage data
+python -m mytnb current-usage 220123456789           # Simplified usage summary
+python -m mytnb due-amount 220123456789              # Account due amount
+python -m mytnb bill-history 220123456789            # Bill payment history
+python -m mytnb smr 220123456789,220987654321        # SMR account statuses
+python -m mytnb services                             # Available services
+python -m mytnb recommendations 220123456789         # Energy recommendations
+```
+
+Alternatively, use a config file (`--config <path>`, `mytnb.json`, or `~/.config/mytnb/config.json`):
+
+```bash
+python -m mytnb init-config   # Generate a starter config file
+```
 
 ## API Architecture
 
@@ -134,9 +132,11 @@ are automatically encrypted using the embedded RSA public key.
 from mytnb.exceptions import MyTNBError, APIError, AuthenticationError
 
 try:
-    usage = await client.get_account_usage_smart("220123456789")
+    client = await MyTNBClient.login("user@example.com", "password")
+    async with client:
+        usage = await client.get_account_usage_smart("220123456789")
 except AuthenticationError:
-    print("Token expired, please re-authenticate")
+    print("Invalid email or password")
 except APIError as e:
     print(f"API error {e.error_code}: {e.display_message}")
 except MyTNBError as e:
