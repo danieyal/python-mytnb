@@ -13,7 +13,7 @@ import tls_client
 
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.crypto import encrypt_request
-from mytnb.exceptions import APIError, AuthenticationError, MyTNBError
+from mytnb.exceptions import APIError, AuthenticationError, GeoBlockedError, MyTNBError
 from mytnb.models import (
     AccountUsage,
     BREligibility,
@@ -145,6 +145,8 @@ class MyTNBClient:
                 },
             )
 
+            if login_resp.status_code == 403:
+                raise GeoBlockedError()
             if login_resp.status_code != 200:
                 raise AuthenticationError(
                     "Login failed",
@@ -298,6 +300,8 @@ class MyTNBClient:
             params=params,
         )
 
+        if response.status_code == 403:
+            raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
         if response.status_code == 429:
@@ -333,6 +337,8 @@ class MyTNBClient:
 
         response = await self._client.get(url, headers=headers, params=params)
 
+        if response.status_code == 403:
+            raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
 
@@ -382,6 +388,8 @@ class MyTNBClient:
 
         response = self._legacy_client.post(url, headers=headers, json=body)
 
+        if response.status_code == 403:
+            raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
 

@@ -34,3 +34,18 @@ class RateLimitError(MyTNBError):
     """Raised when rate limited by the API."""
 
     pass
+
+
+class GeoBlockedError(MyTNBError):
+    """Raised when the request is blocked due to geographic restrictions.
+
+    The myTNB API only allows connections from Malaysian IP addresses
+    and blocks most VPNs.
+    """
+
+    def __init__(self):
+        super().__init__(
+            "Access denied — the myTNB API is restricted to Malaysian IP addresses "
+            "and blocks VPN connections. Connect from a Malaysian network without a VPN.",
+            error_code="403",
+        )

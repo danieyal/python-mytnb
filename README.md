@@ -101,15 +101,21 @@ Request encryption for the ASMX API is automatic — just pass plaintext paramet
 | `SMRAccount`    | Smart Meter Reading eligibility status               |
 | `BREligibility` | Bill rendering opt-in status                         |
 
+## Geographic Restrictions
+
+The myTNB API only accepts connections from **Malaysian IP addresses** and blocks most VPN services. If you get a `GeoBlockedError` (HTTP 403), make sure you are connecting from a Malaysian network without a VPN.
+
 ## Error Handling
 
 ```python
-from mytnb.exceptions import MyTNBError, APIError, AuthenticationError
+from mytnb.exceptions import MyTNBError, APIError, AuthenticationError, GeoBlockedError
 
 try:
     client = await MyTNBClient.login("user@example.com", "password")
     async with client:
         usage = await client.get_account_usage_smart("220123456789")
+except GeoBlockedError:
+    print("Blocked — connect from a Malaysian IP without VPN")
 except AuthenticationError:
     print("Invalid email or password")
 except APIError as e:
