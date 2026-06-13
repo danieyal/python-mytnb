@@ -423,7 +423,7 @@ def init_config(output):
 
 
 def main() -> None:
-    cli()
+    cli(standalone_mode=False)
 
 
 if __name__ == "__main__":
