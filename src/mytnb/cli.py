@@ -342,57 +342,6 @@ def bill_history(ctx, account, as_json):
     _run_async(_history())
 
 
-@cli.command()
-@click.argument("accounts")
-@click.pass_context
-def smr(ctx, accounts):
-    """Get Smart Meter Reading account statuses.
-
-    ACCOUNTS is a comma-separated list of contract account numbers.
-    """
-
-    async def _smr():
-        accs = [a.strip() for a in accounts.split(",")]
-        client = await _get_client(ctx)
-        async with client:
-            with console.status("[bold green]Fetching..."):
-                result = await client.get_smr_accounts(accs)
-            _print_json([r.model_dump() for r in result])
-
-    _run_async(_smr())
-
-
-@cli.command()
-@click.pass_context
-def services(ctx):
-    """Get available services."""
-
-    async def _services():
-        client = await _get_client(ctx)
-        async with client:
-            with console.status("[bold green]Fetching..."):
-                result = await client.get_services()
-            _print_json(result)
-
-    _run_async(_services())
-
-
-@cli.command()
-@click.argument("account")
-@click.pass_context
-def recommendations(ctx, account):
-    """Get energy budget recommendations."""
-
-    async def _recs():
-        client = await _get_client(ctx)
-        async with client:
-            with console.status("[bold green]Fetching..."):
-                result = await client.get_energy_recommendations(account)
-            _print_json(result)
-
-    _run_async(_recs())
-
-
 @cli.command("init-config")
 @click.option("-o", "--output", default="mytnb.json", help="Output path.")
 def init_config(output):
