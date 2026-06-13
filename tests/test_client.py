@@ -1,5 +1,7 @@
 """Tests for mytnb.client API client."""
 
+# pylint: disable=protected-access
+
 import base64
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -444,11 +446,11 @@ class TestLogin:
         with patch("mytnb.client.httpx.AsyncClient", return_value=mock_client):
             client = await MyTNBClient.login("user@example.com", "pass123")
 
-        assert client._credentials.user_info.user_id == "test-uid-123"
-        assert client._credentials.user_info.user_name == "user@example.com"
-        assert client._credentials.authorization_token == "jwt-token-abc"
-        assert client._credentials.api_key == DEFAULT_API_KEY
-        assert client._credentials.device_info is not None
+        assert client.credentials.user_info.user_id == "test-uid-123"
+        assert client.credentials.user_info.user_name == "user@example.com"
+        assert client.credentials.authorization_token == "jwt-token-abc"
+        assert client.credentials.api_key == DEFAULT_API_KEY
+        assert client.credentials.device_info is not None
         await client.close()
 
     @pytest.mark.asyncio
