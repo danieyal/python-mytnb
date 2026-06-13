@@ -4,14 +4,12 @@ from mytnb.models import (
     AccountUsage,
     BillingMonth,
     BREligibility,
-    CostMetric,
     DailyUsage,
+    Metric,
     MonthlyTariffBlock,
     SMRAccount,
     TariffBlock,
-    UsageMetric,
 )
-
 
 # ── Sample API response data ─────────────────────────────────────────────
 
@@ -137,27 +135,29 @@ class TestTariffBlock:
         assert block.start_date is None
 
 
-class TestUsageMetric:
-    def test_parse(self):
-        m = UsageMetric.model_validate(USAGE_METRIC_DATA)
+class TestMetric:
+    def test_parse_usage(self):
+        m = Metric.model_validate(USAGE_METRIC_DATA)
         assert m.key == "CURRENTUSAGE"
         assert m.value == "234.5"
         assert m.value_unit == "kWh"
 
-    def test_numeric_value(self):
-        m = UsageMetric.model_validate(USAGE_METRIC_DATA)
+    def test_numeric_value_usage(self):
+        m = Metric.model_validate(USAGE_METRIC_DATA)
         assert m.numeric_value == 234.5
 
-
-class TestCostMetric:
-    def test_parse(self):
-        m = CostMetric.model_validate(COST_METRIC_DATA)
+    def test_parse_cost(self):
+        m = Metric.model_validate(COST_METRIC_DATA)
         assert m.key == "CURRENTCOST"
         assert m.value == "87.60"
 
-    def test_numeric_value(self):
-        m = CostMetric.model_validate(COST_METRIC_DATA)
+    def test_numeric_value_cost(self):
+        m = Metric.model_validate(COST_METRIC_DATA)
         assert m.numeric_value == 87.60
+
+    def test_numeric_value_fallback(self):
+        m = Metric.model_validate({**COST_METRIC_DATA, "Value": "--"})
+        assert m.numeric_value == 0.0
 
 
 class TestDailyUsage:

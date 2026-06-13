@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import logging
 import re
 import uuid
 from typing import Any, Optional
@@ -38,6 +40,11 @@ USER_AGENT_IOS = "myTNB/1425 CFNetwork/3860.500.112 Darwin/25.4.0"
 
 # Default API key for token generation (embedded in the mobile app)
 DEFAULT_API_KEY = "gpUS5pe4aO2yMbId7bFa13dGfYYnBWbjn3vqn0d7"
+
+# Default security key for legacy ASMX requests (embedded in the mobile app)
+DEFAULT_SECURE_KEY_K1 = "E6148656-205B-494C-BC95-CC241423E72F"
+
+logger = logging.getLogger(__name__)
 
 
 class MyTNBClient:
@@ -155,6 +162,7 @@ class MyTNBClient:
                     "Referer": "https://www.mytnb.com.my/",
                 },
             )
+            logger.info("Sitecore login response: %s", login_resp.status_code)
 
             if login_resp.status_code == 403:
                 raise GeoBlockedError()
@@ -310,6 +318,7 @@ class MyTNBClient:
             json=body or {},
             params=params,
         )
+        logger.debug("REST POST %s → %s", path, response.status_code)
 
         if response.status_code == 403:
             raise GeoBlockedError()
@@ -324,6 +333,7 @@ class MyTNBClient:
         # Check for API-level errors
         status = data.get("statusDetail", {})
         if status.get("code") and status["code"] != "7200":
+            logger.error("REST API error code=%s desc=%s", status.get("code"), status.get("description"))
             raise APIError(
                 message=status.get("description", "Unknown error"),
                 error_code=status.get("code"),
@@ -345,11 +355,14 @@ class MyTNBClient:
             params = {"environment": "Prod"}
 
         response = await self._client.get(url, headers=headers, params=params)
+        logger.debug("REST GET %s → %s", path, response.status_code)
 
         if response.status_code == 403:
             raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
+        if response.status_code == 429:
+            raise RateLimitError("Rate limited by API")
 
         response.raise_for_status()
         return response.json()
@@ -395,12 +408,18 @@ class MyTNBClient:
         payload = encrypt_request(data, use_staging_key=self._use_staging_key)
         body = {"dt": payload.to_dict()}
 
-        response = self._legacy_client.post(url, headers=headers, json=body)
+        response = await asyncio.to_thread(
+            self._legacy_client.post, url, headers=headers, json=body,
+            timeout_seconds=int(self._timeout),
+        )
+        logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
 
         if response.status_code == 403:
             raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
+        if response.status_code == 429:
+            raise RateLimitError("Rate limited by legacy API")
 
         if response.status_code != 200:
             raise APIError(
@@ -507,18 +526,11 @@ class MyTNBClient:
             "did": di.device_id if di else "",
             "ft": "",
             "lang": ui.language,
-            "sec_auth_k1": "E6148656-205B-494C-BC95-CC241423E72F",
+            "sec_auth_k1": DEFAULT_SECURE_KEY_K1,
             "sec_auth_k2": "",
             "ses_param1": "",
             "ses_param2": "",
         }
-
-    def _device_info(self) -> dict:
-        """Build the deviceInf object for legacy ASMX requests."""
-        di = self._credentials.device_info
-        if not di:
-            return {}
-        return di.to_dict()
 
     async def get_account_usage_smart(
         self,
@@ -636,7 +648,7 @@ class MyTNBClient:
         """
         data = {
             "contractAccount": account_number,
-            "isOwnedAccount": is_owner,
+            "isOwnedAccount": "true" if is_owner else "false",
             "usrInf": self._base_user_info(),
         }
         result = await self._legacy_post("GetBillHistory", data)

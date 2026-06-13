@@ -23,8 +23,8 @@ class TariffBlock(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class UsageMetric(BaseModel):
-    """A usage metric (current usage, average usage)."""
+class Metric(BaseModel):
+    """A usage or cost metric returned by the myTNB API."""
 
     key: str = Field(alias="Key")
     title: str = Field(alias="Title")
@@ -37,24 +37,14 @@ class UsageMetric(BaseModel):
 
     @property
     def numeric_value(self) -> float:
-        return float(self.value)
+        try:
+            return float(self.value)
+        except (ValueError, TypeError):
+            return 0.0
 
 
-class CostMetric(BaseModel):
-    """A cost metric (current cost, projected cost)."""
-
-    key: str = Field(alias="Key")
-    title: str = Field(alias="Title")
-    sub_title: str = Field(alias="SubTitle")
-    value: str = Field(alias="Value")
-    value_unit: str = Field(alias="ValueUnit")
-    value_indicator: str = Field(default="", alias="ValueIndicator")
-
-    model_config = {"populate_by_name": True}
-
-    @property
-    def numeric_value(self) -> float:
-        return float(self.value)
+UsageMetric = Metric  # backward-compatible alias
+CostMetric = Metric  # backward-compatible alias
 
 
 class DailyUsage(BaseModel):
@@ -163,8 +153,8 @@ class ByMonthData(BaseModel):
 class AccountUsage(BaseModel):
     """Full account usage response from GetAccountUsageSmart."""
 
-    usage_metrics: list[UsageMetric] = Field(default_factory=list)
-    cost_metrics: list[CostMetric] = Field(default_factory=list)
+    usage_metrics: list[Metric] = Field(default_factory=list)
+    cost_metrics: list[Metric] = Field(default_factory=list)
     current_cycle_start_date: Optional[str] = None
     by_month: Optional[ByMonthData] = None
     by_day: list[DailyUsageWeek] = Field(default_factory=list)
@@ -179,8 +169,8 @@ class AccountUsage(BaseModel):
         usage_list = other_usage.get("Usage", [])
         cost_list = other_usage.get("Cost", [])
 
-        usage_metrics = [UsageMetric.model_validate(u) for u in usage_list]
-        cost_metrics = [CostMetric.model_validate(c) for c in cost_list]
+        usage_metrics = [Metric.model_validate(u) for u in usage_list]
+        cost_metrics = [Metric.model_validate(c) for c in cost_list]
 
         by_month_raw = data.get("ByMonth")
         by_month = ByMonthData.model_validate(by_month_raw) if by_month_raw else None
