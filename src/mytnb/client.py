@@ -66,6 +66,11 @@ class MyTNBClient:
         self._tls_session: Optional[tls_client.Session] = None
 
     @property
+    def credentials(self) -> Credentials:
+        """The authenticated credentials for this client."""
+        return self._credentials
+
+    @property
     def _client(self) -> httpx.AsyncClient:
         if self._http_client is None or self._http_client.is_closed:
             self._http_client = httpx.AsyncClient(

@@ -184,7 +184,7 @@ def login(ctx):
     async def _login():
         client = await _get_client(ctx)
         async with client:
-            ui = client._credentials.user_info
+            ui = client.credentials.user_info
             table = Table(title="Login Successful", show_header=False)
             table.add_column("Field", style="bold cyan")
             table.add_column("Value")
@@ -423,7 +423,7 @@ def init_config(output):
 
 
 def main() -> None:
-    cli(standalone_mode=False)
+    cli()  # pylint: disable=no-value-for-parameter
 
 
 if __name__ == "__main__":
