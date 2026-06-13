@@ -28,7 +28,7 @@ err_console = Console(stderr=True)
 def _handle_exception(debug: bool, exc: BaseException) -> None:
     """Handle exceptions with nice output."""
     if isinstance(exc, click.ClickException):
-        raise
+        raise exc
     if isinstance(exc, click.exceptions.Exit):
         sys.exit(exc.code)
     if isinstance(exc, click.exceptions.Abort):
@@ -55,6 +55,7 @@ class CatchAllGroup(click.Group):
             return super().invoke(ctx)
         except Exception as exc:
             _handle_exception(ctx.params.get("debug", False), exc)
+            return None
 
     def main(self, *args, **kwargs):
         try:
