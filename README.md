@@ -64,9 +64,6 @@ mytnb usage --json <account>                 # Full usage data as JSON
 mytnb current-usage <account>                # Simplified current usage summary
 mytnb due-amount <account>                   # Outstanding balance
 mytnb bill-history <account>                 # Payment history
-mytnb smr <account1>,<account2>              # Smart Meter Reading status
-mytnb services                               # Available services
-mytnb recommendations <account>              # Energy recommendations
 ```
 
 Global options: `--debug` for full tracebacks, `--version`.
