@@ -7,6 +7,7 @@ from mytnb.models import (
     BillingMonth,
     CostMetric,
     DailyUsage,
+    Metric,
     TariffBlock,
     UsageMetric,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "BillingMonth",
     "CostMetric",
     "DailyUsage",
+    "Metric",
     "TariffBlock",
     "UsageMetric",
 ]
