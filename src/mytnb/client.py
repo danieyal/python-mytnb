@@ -410,7 +410,7 @@ class MyTNBClient:
 
         response = await asyncio.to_thread(
             self._legacy_client.post, url, headers=headers, json=body,
-            timeout_seconds=self._timeout,
+            timeout_seconds=int(self._timeout),
         )
         logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
 
