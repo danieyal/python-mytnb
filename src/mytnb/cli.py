@@ -28,7 +28,7 @@ err_console = Console(stderr=True)
 def _handle_exception(debug: bool, exc: BaseException) -> None:
     """Handle exceptions with nice output."""
     if isinstance(exc, click.ClickException):
-        raise
+        raise exc
     if isinstance(exc, click.exceptions.Exit):
         sys.exit(exc.code)
     if isinstance(exc, click.exceptions.Abort):
@@ -55,6 +55,7 @@ class CatchAllGroup(click.Group):
             return super().invoke(ctx)
         except Exception as exc:
             _handle_exception(ctx.params.get("debug", False), exc)
+            return None
 
     def main(self, *args, **kwargs):
         try:
@@ -183,7 +184,7 @@ def login(ctx):
     async def _login():
         client = await _get_client(ctx)
         async with client:
-            ui = client._credentials.user_info
+            ui = client.credentials.user_info
             table = Table(title="Login Successful", show_header=False)
             table.add_column("Field", style="bold cyan")
             table.add_column("Value")
@@ -422,7 +423,7 @@ def init_config(output):
 
 
 def main() -> None:
-    cli()
+    cli()  # pylint: disable=no-value-for-parameter
 
 
 if __name__ == "__main__":

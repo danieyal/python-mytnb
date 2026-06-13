@@ -13,7 +13,13 @@ import tls_client
 
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.crypto import encrypt_request
-from mytnb.exceptions import APIError, AuthenticationError, GeoBlockedError, MyTNBError
+from mytnb.exceptions import (
+    APIError,
+    AuthenticationError,
+    GeoBlockedError,
+    MyTNBError,
+    RateLimitError,
+)
 from mytnb.models import (
     AccountUsage,
     BREligibility,
@@ -58,6 +64,11 @@ class MyTNBClient:
         self._use_staging_key = use_staging_key
         self._http_client: Optional[httpx.AsyncClient] = None
         self._tls_session: Optional[tls_client.Session] = None
+
+    @property
+    def credentials(self) -> Credentials:
+        """The authenticated credentials for this client."""
+        return self._credentials
 
     @property
     def _client(self) -> httpx.AsyncClient:
@@ -305,8 +316,6 @@ class MyTNBClient:
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
         if response.status_code == 429:
-            from mytnb.exceptions import RateLimitError
-
             raise RateLimitError("Rate limited by API")
 
         response.raise_for_status()

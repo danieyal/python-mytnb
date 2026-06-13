@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -233,7 +232,7 @@ class SMRAccount(BaseModel):
 
     @property
     def is_smart_meter(self) -> bool:
-        return self.is_tagged_smr.lower() == "true"
+        return self.is_tagged_smr.lower() == "true"  # pylint: disable=no-member
 
 
 class BREligibility(BaseModel):
