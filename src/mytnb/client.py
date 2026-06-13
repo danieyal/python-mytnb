@@ -95,7 +95,6 @@ class MyTNBClient:
         if self._tls_session is None:
             self._tls_session = tls_client.Session(
                 client_identifier="okhttp4_android_13",
-                timeout_seconds=self._timeout,
             )
         return self._tls_session
 
@@ -410,7 +409,8 @@ class MyTNBClient:
         body = {"dt": payload.to_dict()}
 
         response = await asyncio.to_thread(
-            self._legacy_client.post, url, headers=headers, json=body
+            self._legacy_client.post, url, headers=headers, json=body,
+            timeout_seconds=self._timeout,
         )
         logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
 
