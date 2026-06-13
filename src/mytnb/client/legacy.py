@@ -10,14 +10,16 @@ from typing import Any
 import tls_client
 
 from mytnb.auth import Credentials
-from mytnb.client.config import DEFAULT_SECURE_KEY_K1, LEGACY_BASE_URL, USER_AGENT
+from mytnb.client.config import (
+    DEFAULT_SECURE_KEY_K1,
+    LEGACY_BASE_URL,
+    USER_AGENT,
+    _check_http_status,
+)
 from mytnb.crypto import encrypt_request
 from mytnb.exceptions import (
     APIError,
-    AuthenticationError,
-    GeoBlockedError,
     MyTNBError,
-    RateLimitError,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,12 +96,7 @@ class _LegacyTransport:
         )
         logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
 
-        if response.status_code == 403:
-            raise GeoBlockedError()
-        if response.status_code == 401:
-            raise AuthenticationError("Authentication failed", error_code="401")
-        if response.status_code == 429:
-            raise RateLimitError("Rate limited by legacy API")
+        _check_http_status(response.status_code, context="legacy API")
 
         if response.status_code != 200:
             raise APIError(

@@ -1,1 +1,3 @@
-from mytnb.client.client import MyTNBClient as MyTNBClient
+from mytnb.client.client import MyTNBClient
+
+__all__ = ["MyTNBClient"]

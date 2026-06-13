@@ -9,8 +9,8 @@ from typing import Optional
 import httpx
 
 from mytnb.auth import Credentials
-from mytnb.client.config import REST_BASE_URL
-from mytnb.exceptions import APIError, AuthenticationError, GeoBlockedError, RateLimitError
+from mytnb.client.config import REST_BASE_URL, _check_http_status
+from mytnb.exceptions import APIError
 
 logger = logging.getLogger(__name__)
 
@@ -78,13 +78,7 @@ class _RestTransport:
         )
         logger.debug("REST POST %s → %s", path, response.status_code)
 
-        if response.status_code == 403:
-            raise GeoBlockedError()
-        if response.status_code == 401:
-            raise AuthenticationError("Authentication failed", error_code="401")
-        if response.status_code == 429:
-            raise RateLimitError("Rate limited by API")
-
+        _check_http_status(response.status_code)
         response.raise_for_status()
         data = response.json()
 
@@ -118,12 +112,6 @@ class _RestTransport:
         response = await self._client.get(url, headers=req_headers, params=params)
         logger.debug("REST GET %s → %s", path, response.status_code)
 
-        if response.status_code == 403:
-            raise GeoBlockedError()
-        if response.status_code == 401:
-            raise AuthenticationError("Authentication failed", error_code="401")
-        if response.status_code == 429:
-            raise RateLimitError("Rate limited by API")
-
+        _check_http_status(response.status_code)
         response.raise_for_status()
         return response.json()
