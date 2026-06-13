@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import re
 import uuid
 from typing import Any, Optional
@@ -42,6 +43,8 @@ DEFAULT_API_KEY = "gpUS5pe4aO2yMbId7bFa13dGfYYnBWbjn3vqn0d7"
 
 # Default security key for legacy ASMX requests (embedded in the mobile app)
 DEFAULT_SECURE_KEY_K1 = "E6148656-205B-494C-BC95-CC241423E72F"
+
+logger = logging.getLogger(__name__)
 
 
 class MyTNBClient:
@@ -160,6 +163,7 @@ class MyTNBClient:
                     "Referer": "https://www.mytnb.com.my/",
                 },
             )
+            logger.info("Sitecore login response: %s", login_resp.status_code)
 
             if login_resp.status_code == 403:
                 raise GeoBlockedError()
@@ -315,6 +319,7 @@ class MyTNBClient:
             json=body or {},
             params=params,
         )
+        logger.debug("REST POST %s → %s", path, response.status_code)
 
         if response.status_code == 403:
             raise GeoBlockedError()
@@ -329,6 +334,7 @@ class MyTNBClient:
         # Check for API-level errors
         status = data.get("statusDetail", {})
         if status.get("code") and status["code"] != "7200":
+            logger.error("REST API error code=%s desc=%s", status.get("code"), status.get("description"))
             raise APIError(
                 message=status.get("description", "Unknown error"),
                 error_code=status.get("code"),
@@ -350,6 +356,7 @@ class MyTNBClient:
             params = {"environment": "Prod"}
 
         response = await self._client.get(url, headers=headers, params=params)
+        logger.debug("REST GET %s → %s", path, response.status_code)
 
         if response.status_code == 403:
             raise GeoBlockedError()
@@ -405,6 +412,7 @@ class MyTNBClient:
         response = await asyncio.to_thread(
             self._legacy_client.post, url, headers=headers, json=body
         )
+        logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
 
         if response.status_code == 403:
             raise GeoBlockedError()
