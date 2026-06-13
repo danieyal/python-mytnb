@@ -13,7 +13,6 @@ from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.client import DEFAULT_API_KEY, MyTNBClient
 from mytnb.exceptions import APIError, AuthenticationError, MyTNBError, RateLimitError
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
 

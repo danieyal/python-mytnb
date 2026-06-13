@@ -11,7 +11,6 @@ from mytnb.models import (
     TariffBlock,
 )
 
-
 # ── Sample API response data ─────────────────────────────────────────────
 
 USAGE_METRIC_DATA = {
