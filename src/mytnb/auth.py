@@ -27,17 +27,6 @@ class DeviceInfo:
             "versionCode": self.version_code,
         }
 
-    def to_legacy_dict(self) -> dict:
-        """Build device info for legacy ASMX requests (PascalCase keys)."""
-        return {
-            "DeviceId": self.device_id,
-            "AppVersion": self.app_version,
-            "OsVersion": self.os_version,
-            "OsType": self.os_type,
-            "DeviceDesc": self.device_desc,
-            "VersionCode": self.version_code,
-        }
-
 
 @dataclass
 class UserInfo:

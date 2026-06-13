@@ -532,13 +532,6 @@ class MyTNBClient:
             "ses_param2": "",
         }
 
-    def _device_info(self) -> dict:
-        """Build the deviceInf object for legacy ASMX requests."""
-        di = self._credentials.device_info
-        if not di:
-            return {}
-        return di.to_dict()
-
     async def get_account_usage_smart(
         self,
         account_number: str,
