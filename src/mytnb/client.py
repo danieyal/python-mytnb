@@ -39,6 +39,9 @@ USER_AGENT_IOS = "myTNB/1425 CFNetwork/3860.500.112 Darwin/25.4.0"
 # Default API key for token generation (embedded in the mobile app)
 DEFAULT_API_KEY = "gpUS5pe4aO2yMbId7bFa13dGfYYnBWbjn3vqn0d7"
 
+# Default security key for legacy ASMX requests (embedded in the mobile app)
+DEFAULT_SECURE_KEY_K1 = "E6148656-205B-494C-BC95-CC241423E72F"
+
 
 class MyTNBClient:
     """Client for interacting with the myTNB API.
@@ -507,7 +510,7 @@ class MyTNBClient:
             "did": di.device_id if di else "",
             "ft": "",
             "lang": ui.language,
-            "sec_auth_k1": "E6148656-205B-494C-BC95-CC241423E72F",
+            "sec_auth_k1": DEFAULT_SECURE_KEY_K1,
             "sec_auth_k2": "",
             "ses_param1": "",
             "ses_param2": "",
@@ -636,7 +639,7 @@ class MyTNBClient:
         """
         data = {
             "contractAccount": account_number,
-            "isOwnedAccount": is_owner,
+            "isOwnedAccount": "true" if is_owner else "false",
             "usrInf": self._base_user_info(),
         }
         result = await self._legacy_post("GetBillHistory", data)
