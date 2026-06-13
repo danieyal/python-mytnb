@@ -1,13 +1,11 @@
 """Tests for mytnb.cli module."""
 
 import json
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from mytnb.cli import _build_credentials, _load_config
+from mytnb.cli import _build_credentials, _load_config, main
 
 
 class TestLoadConfig:
@@ -73,7 +71,6 @@ class TestInitConfig:
     def test_creates_config_file(self, tmp_path):
         output = tmp_path / "mytnb.json"
         with patch("sys.argv", ["mytnb", "init-config", "-o", str(output)]):
-            from mytnb.cli import main
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -87,7 +84,6 @@ class TestInitConfig:
         output = tmp_path / "mytnb.json"
         output.write_text("{}")
         with patch("sys.argv", ["mytnb", "init-config", "-o", str(output)]):
-            from mytnb.cli import main
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code != 0

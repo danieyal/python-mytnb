@@ -1,7 +1,8 @@
 """Tests for mytnb.crypto encryption module."""
 
 import base64
-import json
+
+import pytest
 
 from mytnb.crypto import (
     EncryptedPayload,
@@ -35,12 +36,10 @@ class TestPKCS7Padding:
         assert _pkcs7_unpad(_pkcs7_pad(original)) == original
 
     def test_unpad_invalid_zero(self):
-        import pytest
         with pytest.raises(ValueError, match="Invalid PKCS7"):
             _pkcs7_unpad(b"hello\x00")
 
     def test_unpad_invalid_too_large(self):
-        import pytest
         with pytest.raises(ValueError, match="Invalid PKCS7"):
             _pkcs7_unpad(b"hello" + bytes([20]))
 

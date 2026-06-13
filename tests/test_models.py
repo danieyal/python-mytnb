@@ -1,17 +1,12 @@
 """Tests for mytnb.models data models."""
 
-import pytest
-
 from mytnb.models import (
     AccountUsage,
     BillingMonth,
     BREligibility,
-    ByMonthData,
     CostMetric,
     DailyUsage,
-    DailyUsageWeek,
     MonthlyTariffBlock,
-    RP4Usage,
     SMRAccount,
     TariffBlock,
     UsageMetric,

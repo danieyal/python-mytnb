@@ -1,5 +1,6 @@
 """Tests for mytnb.client API client."""
 
+import base64
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -8,20 +9,20 @@ import pytest
 
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.client import DEFAULT_API_KEY, MyTNBClient
-from mytnb.exceptions import APIError, AuthenticationError, MyTNBError
+from mytnb.exceptions import APIError, AuthenticationError, MyTNBError, RateLimitError
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
 
 def _creds(**overrides) -> Credentials:
-    defaults = dict(
-        api_key="test-api-key",
-        authorization_token="test-auth-token",
-        secure_key="test-secure-key",
-        user_info=UserInfo(user_name="test@example.com", user_id="uid-123"),
-        device_info=DeviceInfo(device_id="dev-456"),
-    )
+    defaults = {
+        "api_key": "test-api-key",
+        "authorization_token": "test-auth-token",
+        "secure_key": "test-secure-key",
+        "user_info": UserInfo(user_name="test@example.com", user_id="uid-123"),
+        "device_info": DeviceInfo(device_id="dev-456"),
+    }
     defaults.update(overrides)
     return Credentials(**defaults)
 
@@ -146,7 +147,6 @@ class TestRestPost:
                 client._client, "post", new_callable=AsyncMock,
                 return_value=_mock_response({}, status_code=429),
             ):
-                from mytnb.exceptions import RateLimitError
                 with pytest.raises(RateLimitError):
                     await client._rest_post("test/endpoint")
 
@@ -405,7 +405,6 @@ class TestLogin:
         )
 
         # Build JWT with userId for SSO response
-        import base64
         user_info_json = json.dumps({
             "Channel": "myTNB_API_SSP",
             "UserId": "test-uid-123",
