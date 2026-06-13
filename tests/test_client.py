@@ -10,7 +10,8 @@ import httpx
 import pytest
 
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
-from mytnb.client import DEFAULT_API_KEY, MyTNBClient
+from mytnb.client import MyTNBClient
+from mytnb.client.config import DEFAULT_API_KEY
 from mytnb.exceptions import APIError, AuthenticationError, MyTNBError, RateLimitError
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
@@ -51,42 +52,42 @@ def _mock_tls_response(data: dict, status_code: int = 200) -> MagicMock:
 class TestHeaders:
     def test_rest_headers_include_api_key(self):
         client = MyTNBClient(_creds())
-        headers = client._rest_headers()
+        headers = client._rest_transport.headers()
         assert headers["x-api-key"] == "test-api-key"
         assert headers["Authorization"] == "test-auth-token"
 
     def test_rest_headers_include_view_info_when_device_present(self):
         client = MyTNBClient(_creds())
-        headers = client._rest_headers()
+        headers = client._rest_transport.headers()
         assert "ViewInfo" in headers
         view = json.loads(headers["ViewInfo"])
         assert view["DeviceToken"] == "dev-456"
 
     def test_rest_headers_no_view_info_without_device(self):
         client = MyTNBClient(_creds(device_info=None))
-        headers = client._rest_headers()
+        headers = client._rest_transport.headers()
         assert "ViewInfo" not in headers
 
     def test_rest_headers_include_channel_api_key(self):
         client = MyTNBClient(_creds(channel_api_key="channel-jwt"))
-        headers = client._rest_headers()
+        headers = client._rest_transport.headers()
         assert headers["ApiKey"] == "channel-jwt"
 
     def test_bearer_headers_override_auth(self):
         client = MyTNBClient(_creds(bearer_token="my-bearer"))
-        headers = client._bearer_headers()
+        headers = client._rest_transport.bearer_headers()
         assert headers["Authorization"] == "Bearer my-bearer"
 
     def test_legacy_headers_include_user_info(self):
         client = MyTNBClient(_creds())
-        headers = client._legacy_headers()
+        headers = client._legacy_transport.headers()
         assert "UserInfo" in headers
         user = json.loads(headers["UserInfo"])
         assert user["UserName"] == "test@example.com"
 
     def test_legacy_headers_include_secure_key(self):
         client = MyTNBClient(_creds())
-        headers = client._legacy_headers()
+        headers = client._legacy_transport.headers()
         assert headers["SecureKey"] == "test-secure-key"
 
 
@@ -96,7 +97,7 @@ class TestHeaders:
 class TestBaseUserInfo:
     def test_builds_usr_inf(self):
         client = MyTNBClient(_creds())
-        info = client._base_user_info()
+        info = client._legacy_transport.base_user_info()
         assert info["eid"] == "test@example.com"
         assert info["sspuid"] == "uid-123"
         assert info["did"] == "dev-456"
@@ -105,11 +106,11 @@ class TestBaseUserInfo:
     def test_raises_without_user_info(self):
         client = MyTNBClient(_creds(user_info=None))
         with pytest.raises(MyTNBError, match="user_info is required"):
-            client._base_user_info()
+            client._legacy_transport.base_user_info()
 
     def test_empty_device_id_without_device_info(self):
         client = MyTNBClient(_creds(device_info=None))
-        info = client._base_user_info()
+        info = client._legacy_transport.base_user_info()
         assert info["did"] == ""
 
 
@@ -128,7 +129,7 @@ class TestRestPost:
                 client._client, "post", new_callable=AsyncMock,
                 return_value=_mock_response(response_data),
             ):
-                result = await client._rest_post("test/endpoint", body={"a": 1})
+                result = await client._rest_transport.post("test/endpoint", body={"a": 1})
                 assert result["content"]["result"] == "ok"
 
     @pytest.mark.asyncio
@@ -139,7 +140,7 @@ class TestRestPost:
                 return_value=_mock_response({}, status_code=401),
             ):
                 with pytest.raises(AuthenticationError):
-                    await client._rest_post("test/endpoint")
+                    await client._rest_transport.post("test/endpoint")
 
     @pytest.mark.asyncio
     async def test_rate_limit_raises(self):
@@ -149,7 +150,7 @@ class TestRestPost:
                 return_value=_mock_response({}, status_code=429),
             ):
                 with pytest.raises(RateLimitError):
-                    await client._rest_post("test/endpoint")
+                    await client._rest_transport.post("test/endpoint")
 
     @pytest.mark.asyncio
     async def test_api_error_raises(self):
@@ -165,7 +166,7 @@ class TestRestPost:
                 return_value=_mock_response(response_data),
             ):
                 with pytest.raises(APIError, match="Internal error"):
-                    await client._rest_post("test/endpoint")
+                    await client._rest_transport.post("test/endpoint")
 
 
 # ── Legacy API ────────────────────────────────────────────────────────────
@@ -186,12 +187,11 @@ class TestLegacyPost:
             mock_session.post.return_value = _mock_tls_response(response_data)
             client._tls_session = mock_session
 
-            result = await client._legacy_post(
+            result = await client._legacy_transport.post(
                 "TestEndpoint", {"key": "value"}
             )
             assert result["data"]["result"] == "ok"
 
-            # Verify the body was encrypted (has dt with ae/ak/av)
             call_kwargs = mock_session.post.call_args
             body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
             assert "dt" in body
@@ -213,7 +213,7 @@ class TestLegacyPost:
             client._tls_session = mock_session
 
             with pytest.raises(APIError, match="Account not found"):
-                await client._legacy_post("TestEndpoint", {})
+                await client._legacy_transport.post("TestEndpoint", {})
 
     @pytest.mark.asyncio
     async def test_legacy_auth_error(self):
@@ -223,7 +223,7 @@ class TestLegacyPost:
             client._tls_session = mock_session
 
             with pytest.raises(AuthenticationError):
-                await client._legacy_post("TestEndpoint", {})
+                await client._legacy_transport.post("TestEndpoint", {})
 
 
 # ── Endpoint methods ─────────────────────────────────────────────────────
@@ -376,7 +376,6 @@ class TestContextManager:
     async def test_async_context_manager(self):
         async with MyTNBClient(_creds()) as client:
             assert client._http_client is None  # lazy init
-        # After exit, client should be available (close is safe on None)
 
     @pytest.mark.asyncio
     async def test_close_is_idempotent(self):
@@ -391,7 +390,6 @@ class TestContextManager:
 class TestLogin:
     @pytest.mark.asyncio
     async def test_login_returns_authenticated_client(self):
-        # Mock Sitecore login response (returns SSO form)
         sitecore_home = _mock_response({}, 200)
         sitecore_login = httpx.Response(
             status_code=200,
@@ -405,7 +403,6 @@ class TestLogin:
             request=httpx.Request("POST", "https://www.mytnb.com.my/api/sitecore/Account/Login"),
         )
 
-        # Build JWT with userId for SSO response
         user_info_json = json.dumps({
             "Channel": "myTNB_API_SSP",
             "UserId": "test-uid-123",
@@ -442,7 +439,7 @@ class TestLogin:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("mytnb.client.httpx.AsyncClient", return_value=mock_client):
+        with patch("mytnb.client.auth.httpx.AsyncClient", return_value=mock_client):
             client = await MyTNBClient.login("user@example.com", "pass123")
 
         assert client.credentials.user_info.user_id == "test-uid-123"
@@ -470,6 +467,6 @@ class TestLogin:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("mytnb.client.httpx.AsyncClient", return_value=mock_client):
+        with patch("mytnb.client.auth.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(AuthenticationError, match="Invalid credentials"):
                 await MyTNBClient.login("bad@email.com", "wrong")
