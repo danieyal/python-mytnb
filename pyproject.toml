@@ -42,7 +42,7 @@ dev = [
 mytnb = "mytnb.cli:main"
 
 [project.urls]
-Repository = "https://github.com/latipadidap/python-mytnb"
+Repository = "https://github.com/danieyal/python-mytnb"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mytnb"]
