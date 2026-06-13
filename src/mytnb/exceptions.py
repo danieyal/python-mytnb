@@ -14,8 +14,6 @@ class MyTNBError(Exception):
 class AuthenticationError(MyTNBError):
     """Raised when authentication fails."""
 
-    pass
-
 
 class APIError(MyTNBError):
     """Raised when the API returns an error response."""
@@ -32,8 +30,6 @@ class APIError(MyTNBError):
 
 class RateLimitError(MyTNBError):
     """Raised when rate limited by the API."""
-
-    pass
 
 
 class GeoBlockedError(MyTNBError):
