@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import re
@@ -91,6 +92,7 @@ class MyTNBClient:
         if self._tls_session is None:
             self._tls_session = tls_client.Session(
                 client_identifier="okhttp4_android_13",
+                timeout_seconds=self._timeout,
             )
         return self._tls_session
 
@@ -353,6 +355,8 @@ class MyTNBClient:
             raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
+        if response.status_code == 429:
+            raise RateLimitError("Rate limited by API")
 
         response.raise_for_status()
         return response.json()
@@ -398,12 +402,16 @@ class MyTNBClient:
         payload = encrypt_request(data, use_staging_key=self._use_staging_key)
         body = {"dt": payload.to_dict()}
 
-        response = self._legacy_client.post(url, headers=headers, json=body)
+        response = await asyncio.to_thread(
+            self._legacy_client.post, url, headers=headers, json=body
+        )
 
         if response.status_code == 403:
             raise GeoBlockedError()
         if response.status_code == 401:
             raise AuthenticationError("Authentication failed", error_code="401")
+        if response.status_code == 429:
+            raise RateLimitError("Rate limited by legacy API")
 
         if response.status_code != 200:
             raise APIError(
