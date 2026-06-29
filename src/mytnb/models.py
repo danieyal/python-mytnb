@@ -150,6 +150,26 @@ class ByMonthData(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class TariffBlockLegendItem(BaseModel):
+    """A single tariff rate block in the legend (e.g. BLK1: RM 0.218/kWh)."""
+
+    block_id: str = Field(alias="BlockId")
+    block_range: str = Field(default="", alias="BlockRange")
+    block_price: str = Field(default="", alias="BlockPrice")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+
+class TariffBlockLegendGroup(BaseModel):
+    """A monthly group of RP4 tariff legend items."""
+
+    items: list[TariffBlockLegendItem] = Field(
+        default_factory=list, alias="TariffBlocksLegend"
+    )
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+
 class AccountUsage(BaseModel):
     """Full account usage response from GetAccountUsageSmart."""
 
@@ -161,6 +181,8 @@ class AccountUsage(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     date_range: Optional[str] = None
+    tariff_blocks_legend: list[TariffBlockLegendItem] = Field(default_factory=list)
+    tariff_blocks_legend_rp4: list[TariffBlockLegendGroup] = Field(default_factory=list)
 
     @classmethod
     def from_api_response(cls, data: dict) -> "AccountUsage":
@@ -178,6 +200,18 @@ class AccountUsage(BaseModel):
         by_day_raw = data.get("ByDay", [])
         by_day = [DailyUsageWeek.model_validate(w) for w in by_day_raw]
 
+        # Tariff block legends (residential)
+        legend_raw = data.get("TariffBlocksLegend", [])
+        tariff_blocks_legend = [
+            TariffBlockLegendItem.model_validate(item) for item in legend_raw
+        ]
+
+        # Tariff block legends by month (RP4 commercial)
+        rp4_raw = data.get("TariffBlocksLegendByMonthListRP4", [])
+        tariff_blocks_legend_rp4 = [
+            TariffBlockLegendGroup.model_validate(group) for group in rp4_raw
+        ]
+
         return cls(
             usage_metrics=usage_metrics,
             cost_metrics=cost_metrics,
@@ -187,6 +221,8 @@ class AccountUsage(BaseModel):
             start_date=data.get("StartDate"),
             end_date=data.get("EndDate"),
             date_range=data.get("DateRange"),
+            tariff_blocks_legend=tariff_blocks_legend,
+            tariff_blocks_legend_rp4=tariff_blocks_legend_rp4,
         )
 
     @property

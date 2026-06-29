@@ -12,6 +12,8 @@ from mytnb.models import (
     MonthlyTariffBlock,
     SMRAccount,
     TariffBlock,
+    TariffBlockLegendGroup,
+    TariffBlockLegendItem,
 )
 
 # ── Sample API response data ─────────────────────────────────────────────
@@ -115,6 +117,36 @@ FULL_API_RESPONSE = {
     "StartDate": "2026-05-01",
     "EndDate": "2026-05-15",
     "DateRange": "1 May - 15 May 2026",
+    "TariffBlocksLegend": [
+        {
+            "BlockId": "BLK1",
+            "RGB": {"R": 102, "G": 196, "B": 183},
+            "BlockRange": "1 - 200 kWh",
+            "BlockPrice": "RM 0.218 / kWh",
+        },
+        {
+            "BlockId": "BLK2",
+            "RGB": {"R": 158, "G": 214, "B": 182},
+            "BlockRange": "201 - 300 kWh",
+            "BlockPrice": "RM 0.334 / kWh",
+        },
+    ],
+    "TariffBlocksLegendByMonthListRP4": [
+        {
+            "TariffBlocksLegend": [
+                {
+                    "BlockId": "EnergyCharge",
+                    "BlockRange": "0",
+                    "BlockPrice": "RM 0.2703",
+                },
+                {
+                    "BlockId": "CustomerCharge",
+                    "BlockRange": "0",
+                    "BlockPrice": "RM 10.00",
+                },
+            ],
+        },
+    ],
 }
 
 
@@ -226,6 +258,20 @@ class TestAccountUsage:
         usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
         assert len(usage.by_day) == 1
         assert len(usage.by_day[0].days) == 1
+
+    def test_tariff_blocks_legend(self):
+        usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
+        assert len(usage.tariff_blocks_legend) == 2
+        assert usage.tariff_blocks_legend[0].block_id == "BLK1"
+        assert usage.tariff_blocks_legend[0].block_range == "1 - 200 kWh"
+        assert usage.tariff_blocks_legend[0].block_price == "RM 0.218 / kWh"
+
+    def test_tariff_blocks_legend_rp4(self):
+        usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
+        assert len(usage.tariff_blocks_legend_rp4) == 1
+        assert len(usage.tariff_blocks_legend_rp4[0].items) == 2
+        assert usage.tariff_blocks_legend_rp4[0].items[0].block_id == "EnergyCharge"
+        assert usage.tariff_blocks_legend_rp4[0].items[0].block_price == "RM 0.2703"
 
     def test_empty_response(self):
         usage = AccountUsage.from_api_response({})
@@ -421,3 +467,47 @@ class TestCustomerAccount:
         assert acc.account_desc == ""
         assert acc.owner_name == ""
         assert acc.account_st_address == ""
+
+
+class TestTariffBlockLegendItem:
+    """Tests for TariffBlockLegendItem (residential tariff rate block)."""
+
+    def test_parse(self):
+        item = TariffBlockLegendItem.model_validate({
+            "BlockId": "BLK1",
+            "RGB": {"R": 102, "G": 196, "B": 183},
+            "BlockRange": "1 - 200 kWh",
+            "BlockPrice": "RM 0.218 / kWh",
+        })
+        assert item.block_id == "BLK1"
+        assert item.block_range == "1 - 200 kWh"
+        assert item.block_price == "RM 0.218 / kWh"
+
+    def test_ignores_extra_fields(self):
+        item = TariffBlockLegendItem.model_validate({
+            "BlockId": "BLK1",
+            "RGB": {"R": 0, "G": 0, "B": 0},
+            "BlockRange": "",
+            "BlockPrice": "",
+            "Month": "Jan",
+        })
+        assert item.block_id == "BLK1"
+
+
+class TestTariffBlockLegendGroup:
+    """Tests for TariffBlockLegendGroup (RP4 monthly tariff breakdown)."""
+
+    def test_parse(self):
+        group = TariffBlockLegendGroup.model_validate({
+            "TariffBlocksLegend": [
+                {"BlockId": "EnergyCharge", "BlockRange": "0", "BlockPrice": "RM 0.2703"},
+                {"BlockId": "CustomerCharge", "BlockRange": "0", "BlockPrice": "RM 10.00"},
+            ],
+        })
+        assert len(group.items) == 2
+        assert group.items[0].block_id == "EnergyCharge"
+        assert group.items[1].block_price == "RM 10.00"
+
+    def test_empty(self):
+        group = TariffBlockLegendGroup.model_validate({"TariffBlocksLegend": []})
+        assert group.items == []

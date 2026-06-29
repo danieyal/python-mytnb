@@ -10,6 +10,8 @@ from mytnb.models import (
     DailyUsage,
     Metric,
     TariffBlock,
+    TariffBlockLegendGroup,
+    TariffBlockLegendItem,
     UsageMetric,
 )
 
@@ -24,5 +26,7 @@ __all__ = [
     "DailyUsage",
     "Metric",
     "TariffBlock",
+    "TariffBlockLegendGroup",
+    "TariffBlockLegendItem",
     "UsageMetric",
 ]
