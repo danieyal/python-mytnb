@@ -371,6 +371,48 @@ def init_config(output):
     console.print(f"[green]Config written to[/] {target}")
 
 
+@cli.command()
+@click.option("--json", "as_json", is_flag=True, help="Output full JSON.")
+@click.pass_context
+def accounts(ctx, as_json):
+    """List all linked accounts (auto-discovery)."""
+
+    async def _accounts():
+        client = await _get_client(ctx)
+        async with client:
+            with console.status("[bold green]Fetching accounts..."):
+                result = await client.get_customer_accounts()
+
+            if as_json:
+                _print_json(result)
+                return
+
+            if not result:
+                console.print("[yellow]No linked accounts found.[/]")
+                return
+
+            table = Table(title="Linked Accounts")
+            table.add_column("Account No", style="cyan")
+            table.add_column("Owner", style="bold")
+            table.add_column("Address")
+            table.add_column("SMR", justify="center")
+            table.add_column("Owned", justify="center")
+
+            for acc in result:
+                table.add_row(
+                    acc.account_number,
+                    acc.owner_name or "—",
+                    acc.account_st_address or "—",
+                    "✓" if acc.is_smart_meter else "—",
+                    "✓" if acc.is_owned else "—",
+                )
+
+            console.print(table)
+            console.print(f"\n[dim]{len(result)} account(s) found.[/]")
+
+    _run_async(_accounts())
+
+
 def main() -> None:
     cli()  # pylint: disable=no-value-for-parameter
 

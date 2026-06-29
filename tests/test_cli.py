@@ -1,11 +1,12 @@
 """Tests for mytnb.cli module."""
 
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from click.testing import CliRunner
 
-from mytnb.cli import _build_credentials, _load_config, main
+from mytnb.cli import _build_credentials, _load_config, cli, main
 
 
 class TestLoadConfig:
@@ -87,3 +88,58 @@ class TestInitConfig:
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code != 0
+
+
+class TestAccountsCommand:
+    """Tests for the `mytnb accounts` auto-discovery command."""
+
+    def test_json_output(self, tmp_path):
+        """Test accounts --json produces valid JSON."""
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "api_key": "k",
+            "authorization_token": "t",
+            "secure_key": "sk",
+            "user": {"user_name": "u@t.com", "user_id": "uid"},
+            "device": {"device_id": "did"},
+        }))
+
+        from mytnb.models import CustomerAccount
+        sample_acc = CustomerAccount.model_validate({"accNum": "220123456789"})
+        mock_client = MagicMock()
+        mock_client.get_customer_accounts = AsyncMock(return_value=[sample_acc])
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("mytnb.cli._get_client", AsyncMock(return_value=mock_client)):
+            runner = CliRunner()
+            result = runner.invoke(
+                cli,
+                ["-c", str(cfg_file), "accounts", "--json"],
+            )
+            assert result.exit_code == 0
+
+    def test_no_accounts(self, tmp_path):
+        """Test accounts shows empty message when no linked accounts."""
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "api_key": "k",
+            "authorization_token": "t",
+            "secure_key": "sk",
+            "user": {"user_name": "u@t.com", "user_id": "uid"},
+            "device": {"device_id": "did"},
+        }))
+
+        mock_client = MagicMock()
+        mock_client.get_customer_accounts = AsyncMock(return_value=[])
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("mytnb.cli._get_client", AsyncMock(return_value=mock_client)):
+            runner = CliRunner()
+            result = runner.invoke(
+                cli,
+                ["-c", str(cfg_file), "accounts"],
+            )
+            assert result.exit_code == 0
+            assert "No linked accounts" in result.output

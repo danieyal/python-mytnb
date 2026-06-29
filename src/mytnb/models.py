@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 
 class TariffBlock(BaseModel):
@@ -234,3 +234,106 @@ class BREligibility(BaseModel):
     is_tenant_already_opt_in: bool = Field(default=False, alias="isTenantAlreadyOptIn")
 
     model_config = {"populate_by_name": True}
+
+
+class CustomerAccount(BaseModel):
+    """A linked/customer account returned by the account auto-discovery endpoint.
+
+    Uses GET /v3/account/GetAccount via the AWS API gateway.
+    Returns all accounts linked to the current user without needing
+    to know account numbers ahead of time.
+    """
+
+    account_number: str = Field(alias="accNum")
+    user_account_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("userAccountId", "userAccountID"),
+    )
+    account_desc: str = Field(default="", alias="accDesc")
+    ic_num: str = Field(default="", alias="icNum")
+    current_charges: str = Field(default="", alias="amCurrentChg")
+    is_registered: str = Field(default="", alias="isRegistered")
+    is_paid: str = Field(default="", alias="isPaid")
+    is_owned: str = Field(default="", alias="isOwned")
+    is_error: str = Field(default="", alias="isError")
+    message: Optional[str] = Field(default=None, alias="message")
+    account_type_id: str = Field(default="", alias="accountTypeId")
+    account_st_address: str = Field(default="", alias="accountStAddress")
+    owner_name: str = Field(default="", alias="ownerName")
+    account_category_id: str = Field(default="", alias="accountCategoryId")
+    smart_meter_code: str = Field(
+        default="",
+        validation_alias=AliasChoices("smartMeterCode", "SmartMeterCode"),
+    )
+    is_tagged_smr: str = Field(default="", alias="isTaggedSMR")
+    is_have_access: bool = Field(default=False, alias="IsHaveAccess")
+    is_apply_ebilling: bool = Field(default=False, alias="IsApplyEBilling")
+    budget_amount: str = Field(default="", alias="BudgetAmount")
+    installation_type: str = Field(default="", alias="InstallationType")
+    created_date: str = Field(default="", alias="CreatedDate")
+    business_area: str = Field(default="", alias="BusinessArea")
+    rate_category: str = Field(default="", alias="RateCategory")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    # -- Coerce fields that can arrive as null, numbers, or string bools --
+
+    @field_validator(
+        "account_desc",
+        "ic_num",
+        "current_charges",
+        "budget_amount",
+        "account_type_id",
+        "account_st_address",
+        "owner_name",
+        "account_category_id",
+        "smart_meter_code",
+        "installation_type",
+        "created_date",
+        "business_area",
+        "rate_category",
+        "message",
+        "is_registered",
+        "is_paid",
+        "is_owned",
+        "is_error",
+        "is_tagged_smr",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_to_str(cls, v: Any) -> str:
+        """Normalise values that may arrive as null, int, float, or bool."""
+        if v is None:
+            return ""
+        if isinstance(v, bool):
+            return str(v)
+        if isinstance(v, (int, float)):
+            return str(v)
+        return str(v)
+        if isinstance(v, bool):
+            return str(v)
+        if isinstance(v, (int, float)):
+            return str(v)
+        return str(v)
+
+    # -- Helpers ----------------------------------------------------------
+
+    @property
+    def is_smart_meter(self) -> bool:
+        """Whether this account has a smart meter."""
+        return self.is_tagged_smr.lower() == "true"
+
+    @property
+    def is_registered_bool(self) -> bool:
+        """isRegistered as a boolean."""
+        return self.is_registered.lower() == "true"
+
+    @property
+    def is_owned_bool(self) -> bool:
+        """isOwned as a boolean."""
+        return self.is_owned.lower() == "true"
+
+    @property
+    def is_paid_bool(self) -> bool:
+        """isPaid as a boolean."""
+        return self.is_paid.lower() == "true"

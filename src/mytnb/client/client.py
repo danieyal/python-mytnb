@@ -9,10 +9,11 @@ import tls_client
 
 from mytnb.auth import Credentials
 from mytnb.client.auth import login
-from mytnb.client.config import USER_AGENT
+from mytnb.client.config import AWS_API_BASE_URL, USER_AGENT
 from mytnb.client.legacy import _LegacyTransport
 from mytnb.client.rest import _RestTransport
-from mytnb.models import AccountUsage, BREligibility, SMRAccount
+from mytnb.crypto import encrypt_request
+from mytnb.models import AccountUsage, BREligibility, CustomerAccount, SMRAccount
 
 
 class MyTNBClient:
@@ -182,6 +183,52 @@ class MyTNBClient:
         """Get available services (V4)."""
         data = {"usrInf": self._legacy_transport.base_user_info()}
         return await self._legacy_transport.post("GetServicesV4", data)
+
+    async def get_customer_accounts(self) -> list[CustomerAccount]:
+        """Get all accounts linked to the current user.
+
+        This is the auto-discovery endpoint — call this first to
+        discover which accounts are available, then pass individual
+        account numbers to get_account_usage_smart(), etc.
+
+        Uses POST /v3/account/GetAccount via the AWS API gateway.
+        The payload is encrypted (same encryption as legacy ASMX)
+        but the response is plain JSON (no ``{"d":{...}}`` wrapper).
+        """
+        usr_inf = self._legacy_transport.base_user_info()
+        usr_inf["IsWhiteList"] = False
+        data = {
+            "usrInf": usr_inf,
+            "deviceInf": self._legacy_transport.base_device_info(),
+            "featureInfo": [],
+        }
+
+        payload = encrypt_request(data, use_staging_key=self._use_staging_key)
+        body = {"dt": payload.to_dict()}
+
+        response = await self._client.post(
+            f"{AWS_API_BASE_URL}/v3/account/GetAccount",
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json,text/json,text/x-json,text/javascript,application/xml,text/xml",
+                "User-Agent": USER_AGENT,
+            },
+            json=body,
+        )
+
+        from mytnb.client.config import _check_http_status
+        _check_http_status(response.status_code, context="AWS account API")
+
+        if response.status_code != 200:
+            from mytnb.exceptions import APIError
+            raise APIError(
+                message=f"AWS account API request failed with status {response.status_code}",
+                error_code=str(response.status_code),
+            )
+
+        data = response.json()
+        accounts = data.get("data", [])
+        return [CustomerAccount.model_validate(acc) for acc in accounts]
 
     async def get_energy_recommendations(
         self,
