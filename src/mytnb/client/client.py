@@ -180,11 +180,6 @@ class MyTNBClient:
         accounts = result.get("data", [])
         return [SMRAccount.model_validate(acc) for acc in accounts]
 
-    async def get_services(self) -> dict:
-        """Get available services (V4)."""
-        data = {"usrInf": self._legacy_transport.base_user_info()}
-        return await self._legacy_transport.post("GetServicesV4", data)
-
     async def get_customer_accounts(self) -> list[CustomerAccount]:
         """Get all accounts linked to the current user.
 
@@ -228,21 +223,6 @@ class MyTNBClient:
         data = response.json()
         accounts = data.get("data", [])
         return [CustomerAccount.model_validate(acc) for acc in accounts]
-
-    async def get_energy_recommendations(
-        self,
-        account_number: str,
-        *,
-        is_owner: bool = True,
-    ) -> dict:
-        """Get energy budget recommendations."""
-        data = {
-            "contractAccount": account_number,
-            "isOwner": "true" if is_owner else "false",
-            "usrInf": self._legacy_transport.base_user_info(),
-        }
-        result = await self._legacy_transport.post("GetUserEBRecommendations", data)
-        return result.get("data") or result
 
     async def get_account_due_amount(
         self,
