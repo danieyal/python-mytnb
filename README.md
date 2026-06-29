@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/python-mytnb.svg)](https://badge.fury.io/py/python-mytnb)
+
 # python-mytnb
 
 A Python library to interface with the myTNB (Tenaga Nasional Berhad) API for electricity account management and usage monitoring in Malaysia.
