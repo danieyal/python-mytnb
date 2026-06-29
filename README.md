@@ -1,4 +1,5 @@
 [![PyPI version](https://badge.fury.io/py/python-mytnb.svg)](https://badge.fury.io/py/python-mytnb)
+[![CI](https://github.com/danieyal/python-mytnb/actions/workflows/ci.yml/badge.svg)](https://github.com/danieyal/python-mytnb/actions/workflows/ci.yml)
 
 # python-mytnb
 
