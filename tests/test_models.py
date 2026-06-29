@@ -1,5 +1,7 @@
 """Tests for mytnb.models data models."""
 
+# pylint: disable=duplicate-code
+
 from mytnb.models import (
     AccountUsage,
     BillingMonth,
@@ -374,7 +376,7 @@ class TestCustomerAccount:
         assert acc.is_registered == "False"
         assert acc.is_owned == "False"
 
-    def test_accepts_userAccountId_camelcase(self):
+    def test_accepts_useraccount_id_camelcase(self):
         """Should accept userAccountId (lowercase 'd') as well."""
         data = {**self.SAMPLE}
         del data["userAccountID"]
@@ -382,7 +384,7 @@ class TestCustomerAccount:
         acc = CustomerAccount.model_validate(data)
         assert acc.user_account_id == "ua-camel"
 
-    def test_accepts_smartMeterCode_camelcase(self):
+    def test_accepts_smartmeter_code_camelcase(self):
         """Should accept smartMeterCode (lowercase 's') as well."""
         data = {**self.SAMPLE}
         del data["SmartMeterCode"]

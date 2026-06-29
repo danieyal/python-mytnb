@@ -1,5 +1,7 @@
 """Tests for mytnb.cli module."""
 
+# pylint: disable=duplicate-code
+
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -7,6 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from mytnb.cli import _build_credentials, _load_config, cli, main
+from mytnb.models import CustomerAccount
 
 
 class TestLoadConfig:
@@ -104,7 +107,6 @@ class TestAccountsCommand:
             "device": {"device_id": "did"},
         }))
 
-        from mytnb.models import CustomerAccount
         sample_acc = CustomerAccount.model_validate({"accNum": "220123456789"})
         mock_client = MagicMock()
         mock_client.get_customer_accounts = AsyncMock(return_value=[sample_acc])

@@ -9,10 +9,11 @@ import tls_client
 
 from mytnb.auth import Credentials
 from mytnb.client.auth import login
-from mytnb.client.config import AWS_API_BASE_URL, USER_AGENT
+from mytnb.client.config import AWS_API_BASE_URL, USER_AGENT, _check_http_status
 from mytnb.client.legacy import _LegacyTransport
 from mytnb.client.rest import _RestTransport
 from mytnb.crypto import encrypt_request
+from mytnb.exceptions import APIError
 from mytnb.models import AccountUsage, BREligibility, CustomerAccount, SMRAccount
 
 
@@ -216,11 +217,9 @@ class MyTNBClient:
             json=body,
         )
 
-        from mytnb.client.config import _check_http_status
         _check_http_status(response.status_code, context="AWS account API")
 
         if response.status_code != 200:
-            from mytnb.exceptions import APIError
             raise APIError(
                 message=f"AWS account API request failed with status {response.status_code}",
                 error_code=str(response.status_code),

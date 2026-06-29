@@ -310,30 +310,29 @@ class CustomerAccount(BaseModel):
         if isinstance(v, (int, float)):
             return str(v)
         return str(v)
-        if isinstance(v, bool):
-            return str(v)
-        if isinstance(v, (int, float)):
-            return str(v)
-        return str(v)
 
     # -- Helpers ----------------------------------------------------------
 
     @property
     def is_smart_meter(self) -> bool:
         """Whether this account has a smart meter."""
+        # pylint: disable=no-member
         return self.is_tagged_smr.lower() == "true"
 
     @property
     def is_registered_bool(self) -> bool:
         """isRegistered as a boolean."""
+        # pylint: disable=no-member
         return self.is_registered.lower() == "true"
 
     @property
     def is_owned_bool(self) -> bool:
         """isOwned as a boolean."""
+        # pylint: disable=no-member
         return self.is_owned.lower() == "true"
 
     @property
     def is_paid_bool(self) -> bool:
         """isPaid as a boolean."""
+        # pylint: disable=no-member
         return self.is_paid.lower() == "true"

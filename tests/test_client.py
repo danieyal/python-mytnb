@@ -1,6 +1,6 @@
 """Tests for mytnb.client API client."""
 
-# pylint: disable=protected-access
+# pylint: disable=duplicate-code, protected-access
 
 import base64
 import json
