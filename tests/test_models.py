@@ -1,9 +1,12 @@
 """Tests for mytnb.models data models."""
 
+# pylint: disable=duplicate-code
+
 from mytnb.models import (
     AccountUsage,
     BillingMonth,
     BREligibility,
+    CustomerAccount,
     DailyUsage,
     Metric,
     MonthlyTariffBlock,
@@ -282,3 +285,139 @@ class TestBREligibility:
         e = BREligibility.model_validate({"caNo": "123"})
         assert e.is_owner_over_rule is False
         assert e.is_owner_already_opt_in is False
+
+
+class TestCustomerAccount:
+    """Tests for the GetAccountsV4 / GetAccount response model."""
+
+    SAMPLE = {
+        "accNum": "220123456789",
+        "userAccountID": "user-abc-123",
+        "accDesc": "JALAN EXAMPLE 123",
+        "icNum": "900101-01-1234",
+        "amCurrentChg": 45.50,
+        "isRegistered": "True",
+        "isPaid": "False",
+        "isOwned": "True",
+        "isError": "false",
+        "message": None,
+        "accountTypeId": "1",
+        "accountStAddress": "NO 123, JALAN EXAMPLE, 50000 KL",
+        "ownerName": "AHMAD BIN ALI",
+        "accountCategoryId": "2",
+        "SmartMeterCode": "SMC001",
+        "isTaggedSMR": "true",
+        "IsHaveAccess": True,
+        "IsApplyEBilling": True,
+        "BudgetAmount": 150.00,
+        "InstallationType": "Residential",
+        "CreatedDate": "2024-01-15",
+        "BusinessArea": "KL",
+        "RateCategory": "Tariff A",
+    }
+
+    def test_parse_full(self):
+        acc = CustomerAccount.model_validate(self.SAMPLE)
+        assert acc.account_number == "220123456789"
+        assert acc.user_account_id == "user-abc-123"
+        assert acc.account_desc == "JALAN EXAMPLE 123"
+        assert acc.ic_num == "900101-01-1234"
+        assert acc.current_charges == "45.5"
+        assert acc.is_registered == "True"
+        assert acc.is_paid == "False"
+        assert acc.is_owned == "True"
+        assert acc.is_error == "false"
+        assert acc.message == ""
+        assert acc.account_type_id == "1"
+        assert acc.account_st_address == "NO 123, JALAN EXAMPLE, 50000 KL"
+        assert acc.owner_name == "AHMAD BIN ALI"
+        assert acc.account_category_id == "2"
+        assert acc.smart_meter_code == "SMC001"
+        assert acc.is_tagged_smr == "true"
+        assert acc.is_have_access is True
+        assert acc.is_apply_ebilling is True
+        assert acc.budget_amount == "150.0"
+        assert acc.installation_type == "Residential"
+        assert acc.created_date == "2024-01-15"
+        assert acc.business_area == "KL"
+        assert acc.rate_category == "Tariff A"
+
+    def test_is_smart_meter_true(self):
+        acc = CustomerAccount.model_validate(self.SAMPLE)
+        assert acc.is_smart_meter is True
+
+    def test_is_smart_meter_false(self):
+        data = {**self.SAMPLE, "isTaggedSMR": "false"}
+        acc = CustomerAccount.model_validate(data)
+        assert acc.is_smart_meter is False
+
+    def test_is_smart_meter_case_insensitive(self):
+        data = {**self.SAMPLE, "isTaggedSMR": "True"}
+        acc = CustomerAccount.model_validate(data)
+        assert acc.is_smart_meter is True
+
+    def test_boolean_helpers(self):
+        acc = CustomerAccount.model_validate(self.SAMPLE)
+        assert acc.is_registered_bool is True
+        assert acc.is_owned_bool is True
+        assert acc.is_paid_bool is False
+
+    def test_coerces_numeric_fields(self):
+        """Fields like amCurrentChg and BudgetAmount arrive as numbers."""
+        data = {**self.SAMPLE, "amCurrentChg": 0.0, "BudgetAmount": 0}
+        acc = CustomerAccount.model_validate(data)
+        assert acc.current_charges == "0.0"
+        assert acc.budget_amount == "0"
+
+    def test_coerces_bool_fields(self):
+        """isRegistered etc arrive as string 'True'/'False'."""
+        data = {**self.SAMPLE, "isRegistered": "False", "isOwned": "False"}
+        acc = CustomerAccount.model_validate(data)
+        assert acc.is_registered == "False"
+        assert acc.is_owned == "False"
+
+    def test_accepts_useraccount_id_camelcase(self):
+        """Should accept userAccountId (lowercase 'd') as well."""
+        data = {**self.SAMPLE}
+        del data["userAccountID"]
+        data["userAccountId"] = "ua-camel"
+        acc = CustomerAccount.model_validate(data)
+        assert acc.user_account_id == "ua-camel"
+
+    def test_accepts_smartmeter_code_camelcase(self):
+        """Should accept smartMeterCode (lowercase 's') as well."""
+        data = {**self.SAMPLE}
+        del data["SmartMeterCode"]
+        data["smartMeterCode"] = "SM002"
+        acc = CustomerAccount.model_validate(data)
+        assert acc.smart_meter_code == "SM002"
+
+    def test_minimal_fields(self):
+        acc = CustomerAccount.model_validate({"accNum": "220000000000"})
+        assert acc.account_number == "220000000000"
+        assert acc.user_account_id == ""
+        assert acc.owner_name == ""
+        assert acc.is_smart_meter is False
+
+    def test_ignores_extra_fields(self):
+        """Extra fields from the API (unitNo, building, etc.) are ignored."""
+        data = {**self.SAMPLE, "unitNo": "21-7", "building": "RESIDENSI"}
+        acc = CustomerAccount.model_validate(data)
+        assert acc.account_number == "220123456789"  # still parses fine
+
+    def test_null_fields_become_empty_strings(self):
+        """API sends null for optional fields like icNum, message, etc."""
+        data = {
+            "accNum": "220123456789",
+            "icNum": None,
+            "message": None,
+            "accDesc": None,
+            "ownerName": None,
+            "accountStAddress": None,
+        }
+        acc = CustomerAccount.model_validate(data)
+        assert acc.ic_num == ""
+        assert acc.message == ""
+        assert acc.account_desc == ""
+        assert acc.owner_name == ""
+        assert acc.account_st_address == ""

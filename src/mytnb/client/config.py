@@ -9,6 +9,7 @@ from mytnb.exceptions import AuthenticationError, GeoBlockedError, RateLimitErro
 # Base URLs
 LEGACY_BASE_URL = "https://mytnbapp.tnb.com.my/v7/mytnbws.asmx"
 REST_BASE_URL = "https://api.mytnb.com.my"
+AWS_API_BASE_URL = "https://api.mytnb.com.my/core/api"
 SITECORE_LOGIN_URL = "https://www.mytnb.com.my/api/sitecore/Account/Login"
 SSO_HANDLER_URL = "https://myaccount.mytnb.com.my/SSO/SSOHandler"
 

@@ -27,6 +27,11 @@ async def main():
     client = await MyTNBClient.login("user@example.com", "your-password")
 
     async with client:
+        # Auto-discover linked accounts
+        accounts = await client.get_customer_accounts()
+        for acc in accounts:
+            print(f"{acc.account_number} — {acc.owner_name} (SMR: {acc.is_smart_meter})")
+
         # Get smart meter usage & billing history
         usage = await client.get_account_usage_smart("220123456789")
 
@@ -61,6 +66,8 @@ All commands:
 
 ```
 mytnb login                                  # Test login, show user info
+mytnb accounts                               # List all linked accounts (auto-discovery)
+mytnb accounts --json                        # Account list as JSON
 mytnb usage <account>                        # Monthly usage & billing summary
 mytnb usage --daily <account>                # Daily usage breakdown
 mytnb usage --json <account>                 # Full usage data as JSON
@@ -81,25 +88,27 @@ mytnb init-config   # Generate a starter config file
 
 myTNB uses two API backends, both handled transparently by this library:
 
-| Backend     | Domain                | Auth                                        | Used for                            |
-| ----------- | --------------------- | ------------------------------------------- | ----------------------------------- |
-| REST        | `api.mytnb.com.my`    | JWT + API key                               | Account listing, eligibility checks |
-| Legacy ASMX | `mytnbapp.tnb.com.my` | Encrypted payloads (AES-256-CBC + RSA-OAEP) | Usage data, billing, services       |
+| Backend     | Domain                     | Auth                                        | Used for                            |
+| ----------- | -------------------------- | ------------------------------------------- | ----------------------------------- |
+| REST        | `api.mytnb.com.my`         | JWT + API key                               | Bill eligibility, eligibility icons |
+| AWS Gateway | `api.mytnb.com.my/core/api`| Encrypted payloads (AES-256-CBC + RSA-OAEP) | Account listing (auto-discovery)    |
+| Legacy ASMX | `mytnbapp.tnb.com.my`      | Encrypted payloads (AES-256-CBC + RSA-OAEP) | Usage data, billing, services       |
 
 Request encryption for the ASMX API is automatic — just pass plaintext parameters.
 
 ## Data Models
 
-| Model           | Description                                          |
-| --------------- | ---------------------------------------------------- |
-| `AccountUsage`  | Full usage response: metrics, monthly and daily data |
-| `UsageMetric`   | Current/average usage (kWh)                          |
-| `CostMetric`    | Current/projected cost (RM)                          |
-| `BillingMonth`  | Monthly billing record with tariff blocks            |
-| `DailyUsage`    | Daily consumption and cost                           |
-| `TariffBlock`   | Tariff pricing block details                         |
-| `SMRAccount`    | Smart Meter Reading eligibility status               |
-| `BREligibility` | Bill rendering opt-in status                         |
+| Model             | Description                                          |
+| ----------------- | ---------------------------------------------------- |
+| `CustomerAccount` | Linked account: number, owner, address, SMR status   |
+| `AccountUsage`    | Full usage response: metrics, monthly and daily data |
+| `UsageMetric`     | Current/average usage (kWh)                          |
+| `CostMetric`      | Current/projected cost (RM)                          |
+| `BillingMonth`    | Monthly billing record with tariff blocks            |
+| `DailyUsage`      | Daily consumption and cost                           |
+| `TariffBlock`     | Tariff pricing block details                         |
+| `SMRAccount`      | Smart Meter Reading eligibility status               |
+| `BREligibility`   | Bill rendering opt-in status                         |
 
 ## Geographic Restrictions
 

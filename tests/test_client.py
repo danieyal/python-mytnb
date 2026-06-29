@@ -1,6 +1,6 @@
 """Tests for mytnb.client API client."""
 
-# pylint: disable=protected-access
+# pylint: disable=duplicate-code, protected-access
 
 import base64
 import json
@@ -317,6 +317,69 @@ class TestEndpoints:
             accounts = await client.get_smr_accounts(["220123456789"])
             assert len(accounts) == 1
             assert accounts[0].is_smart_meter is True
+
+    @pytest.mark.asyncio
+    async def test_get_customer_accounts(self):
+        response_data = {
+            "data": [
+                {
+                    "accNum": "220123456789",
+                    "userAccountID": "ua-001",
+                    "accDesc": "JALAN EXAMPLE 123",
+                    "icNum": "900101-01-1234",
+                    "amCurrentChg": 45.50,
+                    "isRegistered": "True",
+                    "isPaid": "False",
+                    "isOwned": "True",
+                    "isError": "false",
+                    "message": None,
+                    "accountTypeId": "1",
+                    "accountStAddress": "NO 123, JALAN EXAMPLE, KL",
+                    "ownerName": "AHMAD BIN ALI",
+                    "accountCategoryId": "2",
+                    "SmartMeterCode": "SMC001",
+                    "isTaggedSMR": "true",
+                    "IsHaveAccess": True,
+                    "IsApplyEBilling": True,
+                    "BudgetAmount": 150.00,
+                    "InstallationType": "Residential",
+                    "CreatedDate": "2024-01-15",
+                    "BusinessArea": "KL",
+                    "RateCategory": "Tariff A",
+                },
+                {
+                    "accNum": "220987654321",
+                    "userAccountID": "ua-002",
+                    "isOwned": "False",
+                    "isTaggedSMR": "false",
+                },
+            ],
+        }
+        async with MyTNBClient(_creds()) as client:
+            with patch.object(
+                client._client, "post", new_callable=AsyncMock,
+                return_value=_mock_response(response_data),
+            ):
+                result = await client.get_customer_accounts()
+                assert len(result) == 2
+                assert result[0].account_number == "220123456789"
+                assert result[0].owner_name == "AHMAD BIN ALI"
+                assert result[0].is_smart_meter is True
+                assert result[0].is_owned_bool is True
+                assert result[1].account_number == "220987654321"
+                assert result[1].is_smart_meter is False
+                assert result[1].is_owned_bool is False
+
+    @pytest.mark.asyncio
+    async def test_get_customer_accounts_empty(self):
+        response_data = {"data": []}
+        async with MyTNBClient(_creds()) as client:
+            with patch.object(
+                client._client, "post", new_callable=AsyncMock,
+                return_value=_mock_response(response_data),
+            ):
+                result = await client.get_customer_accounts()
+                assert result == []
 
     @pytest.mark.asyncio
     async def test_get_current_usage(self):

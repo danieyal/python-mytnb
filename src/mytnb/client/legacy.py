@@ -74,6 +74,13 @@ class _LegacyTransport:
             "ses_param2": "",
         }
 
+    def base_device_info(self) -> dict:
+        """Build the deviceInf object from credentials for legacy ASMX requests."""
+        di = self._credentials.device_info
+        if not di:
+            return {}
+        return di.to_dict()
+
     async def post(self, endpoint: str, data: Any) -> dict:
         """Make a POST request to the legacy ASMX API.
 
