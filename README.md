@@ -88,11 +88,11 @@ mytnb init-config   # Generate a starter config file
 
 myTNB uses two API backends, both handled transparently by this library:
 
-| Backend     | Domain                     | Auth                                        | Used for                            |
-| ----------- | -------------------------- | ------------------------------------------- | ----------------------------------- |
-| REST        | `api.mytnb.com.my`         | JWT + API key                               | Bill eligibility, eligibility icons |
-| AWS Gateway | `api.mytnb.com.my/core/api`| Encrypted payloads (AES-256-CBC + RSA-OAEP) | Account listing (auto-discovery)    |
-| Legacy ASMX | `mytnbapp.tnb.com.my`      | Encrypted payloads (AES-256-CBC + RSA-OAEP) | Usage data, billing, services       |
+| Backend     | Domain                      | Auth                                        | Used for                            |
+| ----------- | --------------------------- | ------------------------------------------- | ----------------------------------- |
+| REST        | `api.mytnb.com.my`          | JWT + API key                               | Bill eligibility, eligibility icons |
+| AWS Gateway | `api.mytnb.com.my/core/api` | Encrypted payloads (AES-256-CBC + RSA-OAEP) | Account listing (auto-discovery)    |
+| Legacy ASMX | `mytnbapp.tnb.com.my`       | Encrypted payloads (AES-256-CBC + RSA-OAEP) | Usage data, billing, services       |
 
 Request encryption for the ASMX API is automatic — just pass plaintext parameters.
 
