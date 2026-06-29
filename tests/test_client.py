@@ -38,7 +38,7 @@ def _mock_response(data: dict, status_code: int = 200) -> httpx.Response:
 
 
 def _mock_tls_response(data: dict, status_code: int = 200) -> MagicMock:
-    """Create a mock tls_client response."""
+    """Create a mock curl_cffi response."""
     resp = MagicMock()
     resp.status_code = status_code
     resp.json.return_value = data

@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Any
 
-import tls_client
+from curl_cffi import requests as curl_requests
 
 from mytnb.auth import Credentials
 from mytnb.client.config import (
@@ -30,7 +30,7 @@ class _LegacyTransport:
 
     def __init__(
         self,
-        session: tls_client.Session,
+        session: curl_requests.Session,
         credentials: Credentials,
         timeout: float,
         use_staging_key: bool,
@@ -85,7 +85,7 @@ class _LegacyTransport:
         """Make a POST request to the legacy ASMX API.
 
         Automatically encrypts the data using AES-256-CBC + RSA-OAEP.
-        Uses tls_client with an Android TLS fingerprint to bypass CloudFront WAF.
+        Uses curl_cffi with a TLS fingerprint to bypass CloudFront WAF.
         """
         url = f"{LEGACY_BASE_URL}/{endpoint}"
         req_headers = self.headers()
@@ -99,7 +99,7 @@ class _LegacyTransport:
             url,
             headers=req_headers,
             json=body,
-            timeout_seconds=int(self._timeout),
+            timeout=int(self._timeout),
         )
         logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
 

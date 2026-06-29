@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import httpx
-import tls_client
+from curl_cffi import requests as curl_requests
 
 from mytnb.auth import Credentials
 from mytnb.client.auth import login
@@ -40,7 +40,7 @@ class MyTNBClient:
         self._timeout = timeout
         self._use_staging_key = use_staging_key
         self._http_client: Optional[httpx.AsyncClient] = None
-        self._tls_session: Optional[tls_client.Session] = None
+        self._tls_session: Optional[curl_requests.Session] = None
         self._rest: Optional[_RestTransport] = None
         self._legacy: Optional[_LegacyTransport] = None
 
@@ -59,14 +59,14 @@ class MyTNBClient:
         return self._http_client
 
     @property
-    def _legacy_client(self) -> tls_client.Session:
-        """Get or create a tls_client session for legacy ASMX requests.
+    def _legacy_client(self) -> curl_requests.Session:
+        """Get or create a curl_cffi session for legacy ASMX requests.
 
-        Uses an Android TLS fingerprint to bypass CloudFront WAF.
+        Uses a TLS fingerprint to bypass CloudFront WAF.
         """
         if self._tls_session is None:
-            self._tls_session = tls_client.Session(
-                client_identifier="okhttp4_android_13",
+            self._tls_session = curl_requests.Session(
+                impersonate="chrome131",
             )
         return self._tls_session
 
