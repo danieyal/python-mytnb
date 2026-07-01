@@ -296,6 +296,7 @@ class TestAccountUsage:
         }
         usage = AccountUsage.from_api_response(data)
         assert usage.current_usage_kwh is None
+        assert usage.average_usage_kwh is None
         assert usage.current_cost_rm is None
 
 
