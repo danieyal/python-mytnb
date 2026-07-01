@@ -269,10 +269,29 @@ class AccountUsage(BaseModel):
 
     @property
     def average_usage_kwh(self) -> Optional[float]:
-        for m in self.usage_metrics:
-            if m.key == "AVGUSAGE":
-                return m.numeric_value
-        return None
+        """Average daily consumption (kWh) across available daily readings.
+
+        Computed from ``by_day`` rather than a usage metric: the API's
+        ``AVERAGEUSAGE`` metric is a percentage comparison against the previous
+        bill period (e.g. "20% — More than the last bill period"), not a kWh
+        value. Days with no recorded consumption are excluded: both missing
+        readings and zero-usage days (such as the current, still-partial day).
+        Returns None when there is no usable daily data.
+        """
+        values: list[float] = []
+        for week in self.by_day:
+            for day in week.days:
+                if day.is_missing_reading:
+                    continue
+                try:
+                    consumption = day.consumption_kwh
+                except (ValueError, TypeError):
+                    continue
+                if consumption > 0:
+                    values.append(consumption)
+        if not values:
+            return None
+        return round(sum(values) / len(values), 2)
 
     @property
     def current_cost_rm(self) -> Optional[float]:
