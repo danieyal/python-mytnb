@@ -14,7 +14,14 @@ from mytnb.client.legacy import _LegacyTransport
 from mytnb.client.rest import _RestTransport
 from mytnb.crypto import encrypt_request
 from mytnb.exceptions import APIError
-from mytnb.models import AccountUsage, BREligibility, CustomerAccount, SMRAccount
+from mytnb.models import (
+    AccountDueAmount,
+    AccountUsage,
+    BillHistoryEntry,
+    BREligibility,
+    CustomerAccount,
+    SMRAccount,
+)
 
 
 class MyTNBClient:
@@ -229,30 +236,37 @@ class MyTNBClient:
         account_number: str,
         *,
         is_owner: bool = True,
-    ) -> dict:
-        """Get account due amount."""
+    ) -> AccountDueAmount:
+        """Get account due amount as a typed model."""
         data = {
             "contractAccount": account_number,
             "isOwnedAccount": "true" if is_owner else "false",
             "usrInf": self._legacy_transport.base_user_info(),
         }
         result = await self._legacy_transport.post("GetAccountDueAmount", data)
-        return result.get("data") or result
+        return AccountDueAmount.from_api_response(result.get("data") or result)
 
     async def get_bill_history(
         self,
         account_number: str,
         *,
         is_owner: bool = True,
-    ) -> dict:
-        """Get bill payment history."""
+    ) -> list[BillHistoryEntry]:
+        """Get bill payment history as typed models (most recent first)."""
         data = {
             "contractAccount": account_number,
             "isOwnedAccount": "true" if is_owner else "false",
             "usrInf": self._legacy_transport.base_user_info(),
         }
         result = await self._legacy_transport.post("GetBillHistory", data)
-        return result.get("data") or result
+        raw = result.get("data") or result
+        if not isinstance(raw, list):
+            return []
+        return [
+            BillHistoryEntry.model_validate(item)
+            for item in raw
+            if isinstance(item, dict)
+        ]
 
     async def get_current_usage(self, account_number: str) -> dict:
         """Get a simplified summary of current usage."""

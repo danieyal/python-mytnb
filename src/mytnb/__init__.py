@@ -3,7 +3,9 @@
 from mytnb.client import MyTNBClient
 from mytnb.crypto import EncryptedPayload, encrypt_request
 from mytnb.models import (
+    AccountDueAmount,
     AccountUsage,
+    BillHistoryEntry,
     BillingMonth,
     CostMetric,
     CustomerAccount,
@@ -19,7 +21,9 @@ __all__ = [
     "MyTNBClient",
     "EncryptedPayload",
     "encrypt_request",
+    "AccountDueAmount",
     "AccountUsage",
+    "BillHistoryEntry",
     "BillingMonth",
     "CostMetric",
     "CustomerAccount",
