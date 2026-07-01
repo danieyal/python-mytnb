@@ -88,12 +88,15 @@ FULL_API_RESPONSE = {
     "OtherUsageMetrics": {
         "Usage": [
             USAGE_METRIC_DATA,
+            # Real API shape: AVERAGEUSAGE is a percentage comparison vs the last
+            # bill period, not a kWh average (that's why average_usage_kwh is
+            # computed from by_day instead of read from this metric).
             {
-                "Key": "AVGUSAGE",
+                "Key": "AVERAGEUSAGE",
                 "Title": "Avg Usage",
-                "SubTitle": "daily",
-                "Value": "15.6",
-                "ValueUnit": "kWh",
+                "SubTitle": "More than the last bill period",
+                "Value": "20%",
+                "ValueUnit": "",
             },
         ],
         "Cost": [
@@ -255,14 +258,18 @@ class TestAccountUsage:
                 {
                     "Range": "Week 1",
                     "Days": [
+                        # Two valid days that count toward the average.
                         {"Date": "2026-06-01", "Year": "2026", "Month": "06",
                          "Day": "01", "Consumption": "10", "Amount": "2.7"},
                         {"Date": "2026-06-02", "Year": "2026", "Month": "06",
                          "Day": "02", "Consumption": "20", "Amount": "5.4"},
-                        # Missing reading and zero/partial day are excluded.
+                        # Excluded via the missing-reading flag (high value would
+                        # skew the mean if the filter regressed).
                         {"Date": "2026-06-03", "Year": "2026", "Month": "06",
-                         "Day": "03", "Consumption": "99", "Amount": "0",
+                         "Day": "03", "Consumption": "99", "Amount": "26.7",
                          "IsMissingReading": True},
+                        # Excluded via zero consumption (the current partial day),
+                        # independently of the missing-reading flag.
                         {"Date": "2026-06-04", "Year": "2026", "Month": "06",
                          "Day": "04", "Consumption": "0", "Amount": "0"},
                     ],

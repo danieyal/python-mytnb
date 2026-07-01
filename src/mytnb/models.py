@@ -274,8 +274,9 @@ class AccountUsage(BaseModel):
         Computed from ``by_day`` rather than a usage metric: the API's
         ``AVERAGEUSAGE`` metric is a percentage comparison against the previous
         bill period (e.g. "20% — More than the last bill period"), not a kWh
-        value. Missing readings and zero/partial days are excluded. Returns None
-        when there is no daily data.
+        value. Days with no recorded consumption are excluded: both missing
+        readings and zero-usage days (such as the current, still-partial day).
+        Returns None when there is no usable daily data.
         """
         values: list[float] = []
         for week in self.by_day:
