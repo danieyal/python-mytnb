@@ -18,6 +18,8 @@ def parse_api_date(value: Any) -> Optional[date_cls]:
     Returns None for empty/None/unparseable input so a single bad field never
     breaks an entire response.
     """
+    if isinstance(value, datetime):
+        return value.date()
     if isinstance(value, date_cls):
         return value
     if not isinstance(value, str) or not value.strip():

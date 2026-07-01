@@ -552,6 +552,16 @@ class TestBillHistoryEntry:
         entry = BillHistoryEntry(date=date(2026, 1, 1), amount=1.0, billing_no="9")
         assert entry.date == date(2026, 1, 1)
 
+    def test_datetime_input_narrowed_to_date(self):
+        from datetime import datetime
+
+        from mytnb.models import parse_api_date
+
+        # A datetime must not leak through as-is (it subclasses date).
+        result = parse_api_date(datetime(2026, 5, 31, 14, 30))
+        assert result == date(2026, 5, 31)
+        assert not isinstance(result, datetime)
+
 
 class TestAccountDueAmount:
     def test_from_wrapped_response(self):

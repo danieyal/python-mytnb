@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 import httpx
@@ -22,6 +23,8 @@ from mytnb.models import (
     CustomerAccount,
     SMRAccount,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class MyTNBClient:
@@ -259,14 +262,22 @@ class MyTNBClient:
             "usrInf": self._legacy_transport.base_user_info(),
         }
         result = await self._legacy_transport.post("GetBillHistory", data)
-        raw = result.get("data") or result
-        if not isinstance(raw, list):
-            return []
-        return [
-            BillHistoryEntry.model_validate(item)
-            for item in raw
-            if isinstance(item, dict)
-        ]
+        raw = result.get("data")
+        if isinstance(raw, list):
+            return [
+                BillHistoryEntry.model_validate(item)
+                for item in raw
+                if isinstance(item, dict)
+            ]
+        # ``data`` absent/empty is a legitimate "no bill history"; anything else
+        # is an unexpected shape worth surfacing when debugging (but not worth
+        # failing the whole account fetch over).
+        if raw is not None:
+            logger.debug(
+                "Unexpected GetBillHistory 'data' payload type: %s",
+                type(raw).__name__,
+            )
+        return []
 
     async def get_current_usage(self, account_number: str) -> dict:
         """Get a simplified summary of current usage."""
