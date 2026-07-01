@@ -48,6 +48,13 @@ asyncio.run(main())
 
 ## CLI
 
+The `mytnb` command-line tool requires the optional `cli` extra (it pulls in
+`click` and `rich`, which the library itself does not need):
+
+```bash
+pip install "python-mytnb[cli]"
+```
+
 Pass credentials directly:
 
 ```bash
