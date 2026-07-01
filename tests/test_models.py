@@ -245,8 +245,32 @@ class TestAccountUsage:
         assert usage.current_usage_kwh == 234.5
 
     def test_average_usage_kwh(self):
+        # Computed from by_day (mean of daily consumption), not a usage metric.
         usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
-        assert usage.average_usage_kwh == 15.6
+        assert usage.average_usage_kwh == 8.5
+
+    def test_average_usage_kwh_multiple_days(self):
+        data = {
+            "ByDay": [
+                {
+                    "Range": "Week 1",
+                    "Days": [
+                        {"Date": "2026-06-01", "Year": "2026", "Month": "06",
+                         "Day": "01", "Consumption": "10", "Amount": "2.7"},
+                        {"Date": "2026-06-02", "Year": "2026", "Month": "06",
+                         "Day": "02", "Consumption": "20", "Amount": "5.4"},
+                        # Missing reading and zero/partial day are excluded.
+                        {"Date": "2026-06-03", "Year": "2026", "Month": "06",
+                         "Day": "03", "Consumption": "99", "Amount": "0",
+                         "IsMissingReading": True},
+                        {"Date": "2026-06-04", "Year": "2026", "Month": "06",
+                         "Day": "04", "Consumption": "0", "Amount": "0"},
+                    ],
+                }
+            ],
+        }
+        usage = AccountUsage.from_api_response(data)
+        assert usage.average_usage_kwh == 15.0  # mean(10, 20)
 
     def test_current_cost_rm(self):
         usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
