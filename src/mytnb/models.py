@@ -268,6 +268,13 @@ class AccountUsage(BaseModel):
         return None
 
     @property
+    def average_usage_kwh(self) -> Optional[float]:
+        for m in self.usage_metrics:
+            if m.key == "AVGUSAGE":
+                return m.numeric_value
+        return None
+
+    @property
     def current_cost_rm(self) -> Optional[float]:
         for m in self.cost_metrics:
             if m.key == "CURRENTCOST":

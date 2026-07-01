@@ -244,6 +244,10 @@ class TestAccountUsage:
         usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
         assert usage.current_usage_kwh == 234.5
 
+    def test_average_usage_kwh(self):
+        usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
+        assert usage.average_usage_kwh == 15.6
+
     def test_current_cost_rm(self):
         usage = AccountUsage.from_api_response(FULL_API_RESPONSE)
         assert usage.current_cost_rm == 87.60
@@ -280,6 +284,7 @@ class TestAccountUsage:
     def test_empty_response(self):
         usage = AccountUsage.from_api_response({})
         assert usage.current_usage_kwh is None
+        assert usage.average_usage_kwh is None
         assert usage.current_cost_rm is None
         assert usage.projected_cost_rm is None
         assert usage.by_month is None
@@ -291,6 +296,7 @@ class TestAccountUsage:
         }
         usage = AccountUsage.from_api_response(data)
         assert usage.current_usage_kwh is None
+        assert usage.average_usage_kwh is None
         assert usage.current_cost_rm is None
 
 
