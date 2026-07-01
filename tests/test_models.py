@@ -2,7 +2,7 @@
 
 # pylint: disable=duplicate-code
 
-from datetime import date
+from datetime import date, datetime
 
 from mytnb.models import (
     AccountDueAmount,
@@ -553,14 +553,12 @@ class TestBillHistoryEntry:
         assert entry.date == date(2026, 1, 1)
 
     def test_datetime_input_narrowed_to_date(self):
-        from datetime import datetime
-
-        from mytnb.models import parse_api_date
-
-        # A datetime must not leak through as-is (it subclasses date).
-        result = parse_api_date(datetime(2026, 5, 31, 14, 30))
-        assert result == date(2026, 5, 31)
-        assert not isinstance(result, datetime)
+        # A datetime must be narrowed to date (it subclasses date), not leak through.
+        entry = BillHistoryEntry.model_validate(
+            {"DtBill": datetime(2026, 5, 31, 14, 30), "AmPayable": "1.0"}
+        )
+        assert entry.date == date(2026, 5, 31)
+        assert not isinstance(entry.date, datetime)
 
 
 class TestAccountDueAmount:
