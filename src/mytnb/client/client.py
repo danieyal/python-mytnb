@@ -247,7 +247,7 @@ class MyTNBClient:
             "usrInf": self._legacy_transport.base_user_info(),
         }
         result = await self._legacy_transport.post("GetAccountDueAmount", data)
-        return AccountDueAmount.from_api_response(result.get("data") or result)
+        return AccountDueAmount.from_api_response(result.get("data", result))
 
     async def get_bill_history(
         self,
