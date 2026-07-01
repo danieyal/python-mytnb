@@ -118,9 +118,14 @@ def _build_credentials(cfg: dict) -> Credentials:
 
 
 def _to_json(data: object) -> str:
-    """Serialize any object to JSON string."""
+    """Serialize any object (or list of models) to JSON string."""
     if hasattr(data, "model_dump"):
         data = data.model_dump()
+    elif isinstance(data, list):
+        data = [
+            item.model_dump() if hasattr(item, "model_dump") else item
+            for item in data
+        ]
     elif hasattr(data, "__dict__") and not isinstance(data, dict):
         data = data.__dict__
     return json.dumps(data, indent=2, default=str)
@@ -293,16 +298,12 @@ def due_amount(ctx, account, as_json):
                 _print_json(result)
                 return
 
-            data = result.get("AccountAmountDue", result) if isinstance(result, dict) else result
-            if isinstance(data, dict):
-                amount = data.get("amountDue", "--")
-                due_date = data.get("billDueDate", "--")
-                console.print(Panel(
-                    f"[bold green]RM {amount}[/]\nDue by [cyan]{due_date}[/]",
-                    title=f"Due Amount — {account}",
-                ))
-            else:
-                _print_json(result)
+            amount = "--" if result.amount_due is None else f"{result.amount_due:.2f}"
+            due_date = result.due_date.isoformat() if result.due_date else "--"
+            console.print(Panel(
+                f"[bold green]RM {amount}[/]\nDue by [cyan]{due_date}[/]",
+                title=f"Due Amount — {account}",
+            ))
 
     _run_async(_due())
 
@@ -324,20 +325,17 @@ def bill_history(ctx, account, as_json):
                 _print_json(result)
                 return
 
-            if isinstance(result, list):
-                table = Table(title=f"Bill History — {account}")
-                table.add_column("Date", style="cyan")
-                table.add_column("Bill No")
-                table.add_column("Amount (RM)", justify="right", style="green")
-                for bill in result:
-                    table.add_row(
-                        bill.get("DtBill", "--"),
-                        bill.get("BillingNo", "--"),
-                        bill.get("AmPayable", "--"),
-                    )
-                console.print(table)
-            else:
-                _print_json(result)
+            table = Table(title=f"Bill History — {account}")
+            table.add_column("Date", style="cyan")
+            table.add_column("Bill No")
+            table.add_column("Amount (RM)", justify="right", style="green")
+            for bill in result:
+                table.add_row(
+                    bill.date.isoformat() if bill.date else "--",
+                    bill.billing_no or "--",
+                    "--" if bill.amount is None else f"{bill.amount:.2f}",
+                )
+            console.print(table)
 
     _run_async(_history())
 

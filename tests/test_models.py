@@ -2,8 +2,12 @@
 
 # pylint: disable=duplicate-code
 
+from datetime import date, datetime
+
 from mytnb.models import (
+    AccountDueAmount,
     AccountUsage,
+    BillHistoryEntry,
     BillingMonth,
     BREligibility,
     CustomerAccount,
@@ -511,3 +515,71 @@ class TestTariffBlockLegendGroup:
     def test_empty(self):
         group = TariffBlockLegendGroup.model_validate({"TariffBlocksLegend": []})
         assert group.items == []
+
+
+class TestBillHistoryEntry:
+    def test_parse_ddmmyyyy(self):
+        entry = BillHistoryEntry.model_validate(
+            {"DtBill": "31/05/2026", "AmPayable": "87.50", "BillingNo": "12345"}
+        )
+        assert entry.date == date(2026, 5, 31)
+        assert entry.amount == 87.50
+        assert entry.billing_no == "12345"
+
+    def test_parse_iso_fallback(self):
+        entry = BillHistoryEntry.model_validate(
+            {"DtBill": "2026-05-31", "AmPayable": "10"}
+        )
+        assert entry.date == date(2026, 5, 31)
+        assert entry.amount == 10.0
+        assert entry.billing_no == ""
+
+    def test_unparseable_date_is_none(self):
+        entry = BillHistoryEntry.model_validate(
+            {"DtBill": "not-a-date", "AmPayable": "5.0"}
+        )
+        assert entry.date is None
+
+    def test_missing_and_null_fields(self):
+        entry = BillHistoryEntry.model_validate(
+            {"DtBill": None, "AmPayable": "", "BillingNo": None}
+        )
+        assert entry.date is None
+        assert entry.amount is None
+        assert entry.billing_no == ""
+
+    def test_populate_by_name(self):
+        entry = BillHistoryEntry(date=date(2026, 1, 1), amount=1.0, billing_no="9")
+        assert entry.date == date(2026, 1, 1)
+
+    def test_datetime_input_narrowed_to_date(self):
+        # A datetime must be narrowed to date (it subclasses date), not leak through.
+        entry = BillHistoryEntry.model_validate(
+            {"DtBill": datetime(2026, 5, 31, 14, 30), "AmPayable": "1.0"}
+        )
+        assert entry.date == date(2026, 5, 31)
+        assert not isinstance(entry.date, datetime)
+
+
+class TestAccountDueAmount:
+    def test_from_wrapped_response(self):
+        due = AccountDueAmount.from_api_response(
+            {"AccountAmountDue": {"amountDue": "12.34", "billDueDate": "30/06/2026"}}
+        )
+        assert due.amount_due == 12.34
+        assert due.due_date == date(2026, 6, 30)
+
+    def test_from_unwrapped_response(self):
+        due = AccountDueAmount.from_api_response(
+            {"amountDue": "5.00", "billDueDate": "2026-06-30"}
+        )
+        assert due.amount_due == 5.0
+        assert due.due_date == date(2026, 6, 30)
+
+    def test_empty_and_invalid(self):
+        assert AccountDueAmount.from_api_response(None).amount_due is None
+        due = AccountDueAmount.from_api_response(
+            {"amountDue": None, "billDueDate": "bad"}
+        )
+        assert due.amount_due is None
+        assert due.due_date is None

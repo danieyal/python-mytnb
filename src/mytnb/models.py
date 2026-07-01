@@ -2,9 +2,44 @@
 
 from __future__ import annotations
 
+from datetime import date as date_cls
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, field_validator
+
+# myTNB returns dates as DD/MM/YYYY; keep ISO variants as fallbacks.
+_API_DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y")
+
+
+def parse_api_date(value: Any) -> Optional[date_cls]:
+    """Parse a myTNB date string (typically DD/MM/YYYY) into a date.
+
+    Returns None for empty/None/unparseable input so a single bad field never
+    breaks an entire response.
+    """
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date_cls):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    for fmt in _API_DATE_FORMATS:
+        try:
+            return datetime.strptime(value.strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_optional_float(value: Any) -> Optional[float]:
+    """Coerce a myTNB numeric string to float, or None if absent/invalid."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
 
 
 class TariffBlock(BaseModel):
@@ -372,3 +407,62 @@ class CustomerAccount(BaseModel):
         """isPaid as a boolean."""
         # pylint: disable=no-member
         return self.is_paid.lower() == "true"
+
+
+class BillHistoryEntry(BaseModel):
+    """A single bill payment history entry from GetBillHistory.
+
+    Raw shape: {"DtBill": "31/05/2026", "AmPayable": "87.50", "BillingNo": "12345"}
+    """
+
+    date: Optional[date_cls] = Field(default=None, alias="DtBill")
+    amount: Optional[float] = Field(default=None, alias="AmPayable")
+    billing_no: str = Field(default="", alias="BillingNo")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _parse_date(cls, v: Any) -> Optional[date_cls]:
+        return parse_api_date(v)
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def _parse_amount(cls, v: Any) -> Optional[float]:
+        return _parse_optional_float(v)
+
+    @field_validator("billing_no", mode="before")
+    @classmethod
+    def _coerce_billing_no(cls, v: Any) -> str:
+        return "" if v is None else str(v)
+
+
+class AccountDueAmount(BaseModel):
+    """Outstanding balance for an account from GetAccountDueAmount.
+
+    Raw shape: {"AccountAmountDue": {"amountDue": "12.34", "billDueDate": "..."}}
+    """
+
+    amount_due: Optional[float] = Field(default=None, alias="amountDue")
+    due_date: Optional[date_cls] = Field(default=None, alias="billDueDate")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    @field_validator("amount_due", mode="before")
+    @classmethod
+    def _parse_amount(cls, v: Any) -> Optional[float]:
+        return _parse_optional_float(v)
+
+    @field_validator("due_date", mode="before")
+    @classmethod
+    def _parse_due_date(cls, v: Any) -> Optional[date_cls]:
+        return parse_api_date(v)
+
+    @classmethod
+    def from_api_response(cls, data: Any) -> "AccountDueAmount":
+        """Parse the (optionally AccountAmountDue-wrapped) due payload."""
+        if isinstance(data, dict):
+            inner = data.get("AccountAmountDue", data)
+            if isinstance(inner, dict):
+                return cls.model_validate(inner)
+        return cls()
