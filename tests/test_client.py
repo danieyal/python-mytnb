@@ -12,6 +12,7 @@ import pytest
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.client import MyTNBClient
 from mytnb.client.config import DEFAULT_API_KEY
+from mytnb.client.retry import DEFAULT_MAX_ATTEMPTS
 from mytnb.exceptions import APIError, AuthenticationError, MyTNBError, RateLimitError
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
@@ -224,6 +225,38 @@ class TestLegacyPost:
 
             with pytest.raises(AuthenticationError):
                 await client._legacy_transport.post("TestEndpoint", {})
+
+    @pytest.mark.asyncio
+    async def test_legacy_retries_transient_404(self, monkeypatch):
+        """A transient HTTP 404 is retried and the eventual 200 succeeds."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        success_data = {
+            "d": {"isError": "false", "ErrorCode": "7200", "data": {"result": "ok"}}
+        }
+        async with MyTNBClient(_creds()) as client:
+            mock_session = MagicMock()
+            mock_session.post.side_effect = [
+                _mock_tls_response({}, status_code=404),
+                _mock_tls_response(success_data),
+            ]
+            client._tls_session = mock_session
+
+            result = await client._legacy_transport.post("TestEndpoint", {})
+            assert result["data"]["result"] == "ok"
+            assert mock_session.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_legacy_persistent_404_raises_after_attempts(self, monkeypatch):
+        """A persistent HTTP 404 raises APIError after exhausting attempts."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        async with MyTNBClient(_creds()) as client:
+            mock_session = MagicMock()
+            mock_session.post.return_value = _mock_tls_response({}, status_code=404)
+            client._tls_session = mock_session
+
+            with pytest.raises(APIError, match="status 404"):
+                await client._legacy_transport.post("TestEndpoint", {})
+            assert mock_session.post.call_count == DEFAULT_MAX_ATTEMPTS
 
 
 # ── Endpoint methods ─────────────────────────────────────────────────────
