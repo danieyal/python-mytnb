@@ -63,9 +63,15 @@ async def with_retry(
         Whatever ``send`` returns on the first successful attempt.
 
     Raises:
+        ValueError: If ``attempts`` < 1 or ``base_delay`` < 0.
         The last exception raised by ``send`` once attempts are exhausted, or
         immediately for any non-retryable error.
     """
+    if attempts < 1:
+        raise ValueError(f"attempts must be >= 1, got {attempts}")
+    if base_delay < 0:
+        raise ValueError(f"base_delay must be >= 0, got {base_delay}")
+
     for attempt in range(attempts):
         try:
             return await send()
