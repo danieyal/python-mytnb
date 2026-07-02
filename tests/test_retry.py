@@ -81,6 +81,22 @@ async def test_network_error_is_retryable():
     assert send.calls == 2
 
 
+@pytest.mark.asyncio
+async def test_invalid_attempts_raises():
+    send = _Counter(lambda n: "ok")
+    with pytest.raises(ValueError, match="attempts must be >= 1"):
+        await with_retry(send, attempts=0, base_delay=0)
+    assert send.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_invalid_base_delay_raises():
+    send = _Counter(lambda n: "ok")
+    with pytest.raises(ValueError, match="base_delay must be >= 0"):
+        await with_retry(send, base_delay=-1)
+    assert send.calls == 0
+
+
 def test_retryable_status_codes():
     assert 404 in RETRYABLE_STATUS_CODES
     assert 503 in RETRYABLE_STATUS_CODES
