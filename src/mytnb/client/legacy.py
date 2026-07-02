@@ -16,6 +16,7 @@ from mytnb.client.config import (
     USER_AGENT,
     _check_http_status,
 )
+from mytnb.client.retry import RETRYABLE_STATUS_CODES, with_retry
 from mytnb.crypto import encrypt_request
 from mytnb.exceptions import (
     APIError,
@@ -94,22 +95,27 @@ class _LegacyTransport:
         payload = encrypt_request(data, use_staging_key=self._use_staging_key)
         body = {"dt": payload.to_dict()}
 
-        response = await asyncio.to_thread(
-            self._session.post,
-            url,
-            headers=req_headers,
-            json=body,
-            timeout=int(self._timeout),
-        )
-        logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
-
-        _check_http_status(response.status_code, context="legacy API")
-
-        if response.status_code != 200:
-            raise APIError(
-                message=f"Legacy API request failed with status {response.status_code}",
-                error_code=str(response.status_code),
+        async def _send() -> Any:
+            response = await asyncio.to_thread(
+                self._session.post,
+                url,
+                headers=req_headers,
+                json=body,
+                timeout=int(self._timeout),
             )
+            logger.debug("Legacy POST %s → %s", endpoint, response.status_code)
+
+            _check_http_status(response.status_code, context="legacy API")
+
+            if response.status_code != 200:
+                raise APIError(
+                    message=f"Legacy API request failed with status {response.status_code}",
+                    error_code=str(response.status_code),
+                    retryable=response.status_code in RETRYABLE_STATUS_CODES,
+                )
+            return response
+
+        response = await with_retry(_send, logger=logger)
 
         data = response.json()
 

@@ -10,6 +10,7 @@ import httpx
 
 from mytnb.auth import Credentials
 from mytnb.client.config import REST_BASE_URL, _check_http_status
+from mytnb.client.retry import RETRYABLE_STATUS_CODES, with_retry
 from mytnb.exceptions import APIError
 
 logger = logging.getLogger(__name__)
@@ -70,16 +71,26 @@ class _RestTransport:
         if params is None:
             params = {"environment": "Prod"}
 
-        response = await self._client.post(
-            url,
-            headers=req_headers,
-            json=body or {},
-            params=params,
-        )
-        logger.debug("REST POST %s → %s", path, response.status_code)
+        async def _send() -> httpx.Response:
+            response = await self._client.post(
+                url,
+                headers=req_headers,
+                json=body or {},
+                params=params,
+            )
+            logger.debug("REST POST %s → %s", path, response.status_code)
 
-        _check_http_status(response.status_code)
-        response.raise_for_status()
+            _check_http_status(response.status_code)
+            if response.status_code in RETRYABLE_STATUS_CODES:
+                raise APIError(
+                    message=f"REST API request failed with status {response.status_code}",
+                    error_code=str(response.status_code),
+                    retryable=True,
+                )
+            response.raise_for_status()
+            return response
+
+        response = await with_retry(_send, logger=logger)
         data = response.json()
 
         status = data.get("statusDetail", {})
@@ -109,9 +120,19 @@ class _RestTransport:
         if params is None:
             params = {"environment": "Prod"}
 
-        response = await self._client.get(url, headers=req_headers, params=params)
-        logger.debug("REST GET %s → %s", path, response.status_code)
+        async def _send() -> httpx.Response:
+            response = await self._client.get(url, headers=req_headers, params=params)
+            logger.debug("REST GET %s → %s", path, response.status_code)
 
-        _check_http_status(response.status_code)
-        response.raise_for_status()
+            _check_http_status(response.status_code)
+            if response.status_code in RETRYABLE_STATUS_CODES:
+                raise APIError(
+                    message=f"REST API request failed with status {response.status_code}",
+                    error_code=str(response.status_code),
+                    retryable=True,
+                )
+            response.raise_for_status()
+            return response
+
+        response = await with_retry(_send, logger=logger)
         return response.json()

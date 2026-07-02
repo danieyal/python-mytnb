@@ -23,8 +23,10 @@ class APIError(MyTNBError):
         message: str,
         error_code: str | None = None,
         display_message: str | None = None,
+        retryable: bool = False,
     ):
         self.display_message = display_message
+        self.retryable = retryable
         super().__init__(message, error_code)
 
 

@@ -12,6 +12,7 @@ import pytest
 from mytnb.auth import Credentials, DeviceInfo, UserInfo
 from mytnb.client import MyTNBClient
 from mytnb.client.config import DEFAULT_API_KEY
+from mytnb.client.retry import DEFAULT_MAX_ATTEMPTS
 from mytnb.exceptions import APIError, AuthenticationError, MyTNBError, RateLimitError
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
@@ -168,6 +169,49 @@ class TestRestPost:
                 with pytest.raises(APIError, match="Internal error"):
                     await client._rest_transport.post("test/endpoint")
 
+    @pytest.mark.asyncio
+    async def test_post_retries_transient_503(self, monkeypatch):
+        """A transient HTTP 503 is retried and the eventual 200 succeeds."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        success = _mock_response(
+            {"statusDetail": {"code": "7200"}, "content": {"result": "ok"}}
+        )
+        async with MyTNBClient(_creds()) as client:
+            with patch.object(
+                client._client, "post", new_callable=AsyncMock,
+                side_effect=[_mock_response({}, status_code=503), success],
+            ) as mock_post:
+                result = await client._rest_transport.post("test/endpoint")
+                assert result["content"]["result"] == "ok"
+                assert mock_post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_post_persistent_404_raises_after_attempts(self, monkeypatch):
+        """A persistent HTTP 404 raises APIError after exhausting attempts."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        async with MyTNBClient(_creds()) as client:
+            with patch.object(
+                client._client, "post", new_callable=AsyncMock,
+                return_value=_mock_response({}, status_code=404),
+            ) as mock_post:
+                with pytest.raises(APIError, match="status 404"):
+                    await client._rest_transport.post("test/endpoint")
+                assert mock_post.call_count == DEFAULT_MAX_ATTEMPTS
+
+    @pytest.mark.asyncio
+    async def test_get_retries_transient_502(self, monkeypatch):
+        """REST GET retries a transient HTTP 502 then returns the payload."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        success = _mock_response({"content": {"result": "ok"}})
+        async with MyTNBClient(_creds()) as client:
+            with patch.object(
+                client._client, "get", new_callable=AsyncMock,
+                side_effect=[_mock_response({}, status_code=502), success],
+            ) as mock_get:
+                result = await client._rest_transport.get("test/endpoint")
+                assert result["content"]["result"] == "ok"
+                assert mock_get.call_count == 2
+
 
 # ── Legacy API ────────────────────────────────────────────────────────────
 
@@ -224,6 +268,38 @@ class TestLegacyPost:
 
             with pytest.raises(AuthenticationError):
                 await client._legacy_transport.post("TestEndpoint", {})
+
+    @pytest.mark.asyncio
+    async def test_legacy_retries_transient_404(self, monkeypatch):
+        """A transient HTTP 404 is retried and the eventual 200 succeeds."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        success_data = {
+            "d": {"isError": "false", "ErrorCode": "7200", "data": {"result": "ok"}}
+        }
+        async with MyTNBClient(_creds()) as client:
+            mock_session = MagicMock()
+            mock_session.post.side_effect = [
+                _mock_tls_response({}, status_code=404),
+                _mock_tls_response(success_data),
+            ]
+            client._tls_session = mock_session
+
+            result = await client._legacy_transport.post("TestEndpoint", {})
+            assert result["data"]["result"] == "ok"
+            assert mock_session.post.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_legacy_persistent_404_raises_after_attempts(self, monkeypatch):
+        """A persistent HTTP 404 raises APIError after exhausting attempts."""
+        monkeypatch.setattr("mytnb.client.retry.asyncio.sleep", AsyncMock())
+        async with MyTNBClient(_creds()) as client:
+            mock_session = MagicMock()
+            mock_session.post.return_value = _mock_tls_response({}, status_code=404)
+            client._tls_session = mock_session
+
+            with pytest.raises(APIError, match="status 404"):
+                await client._legacy_transport.post("TestEndpoint", {})
+            assert mock_session.post.call_count == DEFAULT_MAX_ATTEMPTS
 
 
 # ── Endpoint methods ─────────────────────────────────────────────────────
